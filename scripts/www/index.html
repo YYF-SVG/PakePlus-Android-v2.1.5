@@ -1,11 +1,3452 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus</title>
-    </head>
-    <body>
-        PakePlus
-    </body>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>汽车费用追踪</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* 全局样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+            padding-bottom: 20px;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        /* 头部样式 */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+            color: white;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        /* 导航样式 */
+        .nav-tabs {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background-color: white;
+            border-radius: 16px;
+            padding: 5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            flex: 1;
+            min-width: 80px;
+            padding: 12px 8px;
+            border: none;
+            background-color: transparent;
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .nav-tab i {
+            font-size: 18px;
+        }
+
+        .nav-tab.active {
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        /* 标签内容 */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 时间选择器 */
+        .time-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 8px;
+        }
+
+        .time-btn {
+            flex: 1;
+            max-width: 80.5px; /* 70px * 1.15 = 80.5px */
+            padding: 8.05px 12.88px; /* 7px * 1.15 = 8.05px, 11.2px * 1.15 = 12.88px */
+            border: 1px solid #4CAF50;
+            background-color: white;
+            color: #4CAF50;
+            font-size: 11.27px; /* 9.8px * 1.15 = 11.27px */
+            font-weight: 500;
+            border-radius: 16.1px; /* 14px * 1.15 = 16.1px */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        }
+
+        .time-btn.active {
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        /* 卡片容器 */
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 16px;
+            padding: 23.4px 15px; /* 增高30% */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .card h3 {
+            color: #666;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            color: #333;
+            font-size: 1.4rem;
+            font-weight: 600;
+            line-height: 1.3;
+            text-align: center;
+            padding: 0 4px;
+            min-height: 52px; /* 增高30% */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .card-value .unit {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* 年度数据 */
+        .yearly-data {
+            margin-top: 25px;
+            background-color: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .yearly-data h2 {
+            color: #4CAF50;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* 录入方式选择 */
+        .input-method {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 16px;
+            gap: 8px;
+        }
+
+        .method-btn {
+            flex: 1;
+            max-width: 140px;
+            padding: 10px 16px;
+            border: 1px solid #4CAF50;
+            background-color: white;
+            color: #4CAF50;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .method-btn.active {
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        /* 表单样式 */
+        .input-form {
+            background-color: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            width: 100%;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        /* 文本输入区域 */
+        .text-input-area {
+            background-color: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .text-input-area h4 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .text-input-area .input-hint {
+            background-color: #f0f8ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #e0f2fe;
+        }
+
+        .text-input-area .input-hint ul {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .text-input-area .input-hint li {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+            padding-left: 15px;
+            position: relative;
+        }
+
+        .text-input-area .input-hint li:before {
+            content: "•";
+            color: #4CAF50;
+            position: absolute;
+            left: 0;
+        }
+
+        .text-input-area .input-hint li:last-child {
+            margin-bottom: 0;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .text-input-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .text-input-btn:hover {
+            background-color: #45a049;
+        }
+
+        .reset-btn {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 500;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: block;
+            margin: 15px auto;
+            width: 100%;
+            max-width: 200px;
+            text-align: center;
+        }
+
+        .submit-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+            width: 100%;
+            max-width: 200px;
+            display: block;
+            margin: 15px auto;
+        }
+
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* 记录列表 */
+        .records-container {
+            background-color: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .records-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .records-container h3 {
+            color: #4CAF50;
+            font-size: 1.3rem;
+            margin: 0;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .expand-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .expand-btn:hover {
+            background-color: #45a049;
+        }
+
+        .expand-btn.expanded {
+            background-color: #2196F3;
+        }
+
+        .expand-btn.expanded i {
+            transform: rotate(180deg);
+        }
+
+        .expand-btn.expanded span {
+            content: '收起';
+        }
+
+        .records-container {
+            background-color: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .records-table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            min-width: 500px;
+        }
+
+        .records-table th {
+            background-color: #fafafa;
+            color: #666;
+            font-weight: 600;
+            padding: 12px 8px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+
+        .records-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+            text-align: center;
+        }
+
+        .records-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .delete-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        /* 图表容器 */
+        .charts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-wrapper {
+            background-color: white;
+            border-radius: 16px;
+            padding: 25px 20px 15px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            min-height: 260px; /* 增高30% */
+            max-height: 325px; /* 增高30% */
+            overflow: hidden;
+            position: relative;
+        }
+
+
+
+
+        /* 为电耗趋势图表设置固定高度 */
+        #electricityChart {
+            height: 227.5px !important; /* 增高30% */
+            width: 100% !important;
+        }
+        
+        /* 饼图canvas缩小到原来的70%大小 */
+        #costChart {
+            transform: scale(0.7);
+            transform-origin: center top;
+        }
+        
+        /* 通用canvas样式 */
+        .chart-wrapper canvas {
+            display: block;
+            margin: 0 auto;
+        }
+
+        .chart-wrapper h3 {
+            color: #4CAF50;
+            margin-bottom: 16px;
+            text-align: center;
+            font-size: 1.3rem;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* 费用构成卡片高度调整到380px */
+        .cost-chart-wrapper {
+            min-height: 380px !important;
+            max-height: 380px !important;
+        }
+
+        /* 导出导入按钮 */
+        .export-import {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+            align-items: center;
+        }
+
+        .action-btn {
+            width: 100%;
+            max-width: 300px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        /* 危险按钮样式 */
+        .danger-btn {
+            background-color: #f44336;
+            box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+        }
+
+        .danger-btn:hover {
+            background-color: #d32f2f;
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+        }
+
+        /* 数据备份/恢复样式 */
+        .backup-restore {
+            margin-top: 25px;
+            background-color: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }
+
+        .backup-restore h2 {
+            color: #4CAF50;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* 统计标题 */
+        h2 {
+            color: #4CAF50;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* 按钮选择组 */
+        .radio-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .radio-btn {
+            padding: 12px 20px;
+            border: 2px solid #4CAF50;
+            background-color: white;
+            color: #4CAF50;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            max-width: 120px;
+            text-align: center;
+        }
+
+        .radio-btn.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        /* 空状态提示 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 16px;
+        }
+
+        /* 成功提示 */
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+            display: none;
+        }
+
+        /* 响应式调整 */
+        @media (min-width: 768px) {
+            .cards-container {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .form-row {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            
+            .form-group {
+                flex: 1;
+                min-width: calc(50% - 8px);
+            }
+            
+            .export-import {
+                flex-direction: row;
+                justify-content: center;
+            }
+            
+            .action-btn {
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-car"></i> 汽车费用追踪</h1>
+        </header>
+
+        <!-- 主导航 -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="dashboard">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>仪表盘</span>
+            </button>
+            <button class="nav-tab" data-tab="charging">
+                <i class="fas fa-charging-station"></i>
+                <span>充电</span>
+            </button>
+            <button class="nav-tab" data-tab="parking">
+                <i class="fas fa-parking"></i>
+                <span>停车</span>
+            </button>
+            <button class="nav-tab" data-tab="statistics">
+                <i class="fas fa-chart-bar"></i>
+                <span>统计</span>
+            </button>
+        </nav>
+
+        <!-- 仪表盘 -->
+        <section id="dashboard" class="tab-content active">
+            <!-- 数据导出提示 -->
+            <div id="exportInfo" style="background-color: #ffffff; border: 1px solid #e0e0e0; color: #000000; padding: 12px 15px; border-radius: 20px; margin-bottom: 15px; font-size: 11.2px; font-weight: bold; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); position: relative; transform: translateY(0); transition: all 0.3s ease;">
+                上次数据备份时间为<span id="lastExportTime">从未导出</span>，你已 <span id="daysSinceExport">0</span> 天未备份数据
+            </div>
+            
+            <!-- 时间选择器 -->
+            <div class="time-selector">
+                <button class="time-btn active" data-time="month">本月</button>
+                <button class="time-btn" data-time="year">今年</button>
+                <button class="time-btn" data-time="total">全部</button>
+            </div>
+
+            <!-- 数据卡片 -->
+            <div class="cards-container">
+                <div class="card">
+                    <h3><i class="fas fa-calendar-day"></i> 行驶总天数</h3>
+                    <div class="card-value" id="totalDays">0</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-bolt"></i> 百公里电耗</h3>
+                    <div class="card-value" id="electricityPer100km">0 <span class="unit">度/百公里</span></div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-charging-station"></i> 充电费用</h3>
+                    <div class="card-value" id="totalChargingFee">¥0</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-parking"></i> 停车费用</h3>
+                    <div class="card-value" id="totalParkingFee">¥0</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-road"></i> 每公里费用</h3>
+                    <div class="card-value" id="costPerKm">¥0<span class="unit">/km</span></div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-calendar-alt"></i> 每天费用</h3>
+                    <div class="card-value" id="costPerDay">¥0<span class="unit">/天</span></div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-battery-full"></i> 充满次数</h3>
+                    <div class="card-value" id="fullChargeCount">0</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-plug"></i> 总用电度数</h3>
+                    <div class="card-value" id="totalElectricity">0 <span class="unit">度</span></div>
+                </div>
+            </div>
+
+            <!-- 年度数据 -->
+            <div class="yearly-data">
+                <h2><i class="fas fa-chart-line"></i> 年度概览</h2>
+                <div class="cards-container">
+                    <div class="card">
+                        <h3>年度总里程</h3>
+                        <div class="card-value" id="yearlyMileage">0 <span class="unit">km</span></div>
+                    </div>
+                    <div class="card">
+                        <h3>年度总充电量</h3>
+                        <div class="card-value" id="yearlyChargingAmount">0 <span class="unit">kWh</span></div>
+                    </div>
+                    <div class="card">
+                        <h3>年度充电费用</h3>
+                        <div class="card-value" id="yearlyChargingFee">¥0</div>
+                    </div>
+                    <div class="card">
+                        <h3>年度停车费用</h3>
+                        <div class="card-value" id="yearlyParkingFee">¥0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据备份/恢复 -->
+            <div class="backup-restore">
+                <h2><i class="fas fa-database"></i> 数据备份/恢复</h2>
+                <div class="export-import">
+                    <button id="exportExcel" class="action-btn">
+                        <i class="fas fa-file-export"></i> 导出Excel
+                    </button>
+                    <input type="file" id="importExcel" accept=".xlsx, .xls" style="display: none;">
+                    <button id="importBtn" class="action-btn">
+                        <i class="fas fa-file-import"></i> 导入Excel
+                    </button>
+                    <button id="clearAllData" class="action-btn danger-btn">
+                        <i class="fas fa-trash"></i> 数据清零
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 充电记录 -->
+        <section id="charging" class="tab-content">
+            <h2><i class="fas fa-charging-station"></i> 充电</h2>
+            
+            <!-- 录入方式选择 -->
+            <div class="input-method">
+                <button class="method-btn active" data-method="text">
+                    <i class="fas fa-keyboard"></i> 表单输入
+                </button>
+                <button class="method-btn" data-method="quick">
+                    <i class="fas fa-bolt"></i> 快速输入
+                </button>
+            </div>
+
+            <!-- 文字输入表单 -->
+            <form id="chargingForm" class="input-form">
+                <input type="hidden" id="editRecordId" value="">
+                <div id="chargingSuccess" class="success-message">
+                    <i class="fas fa-check-circle"></i> 充电记录保存成功！
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="chargingDate"><i class="far fa-calendar-alt"></i> 日期</label>
+                        <input type="date" id="chargingDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="chargingMileage"><i class="fas fa-tachometer-alt"></i> 里程 (km)</label>
+                        <input type="number" id="chargingMileage" step="1" required placeholder="充电时总里程">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-battery-full"></i> 是否充满</label>
+                        <div class="radio-group">
+                            <button type="button" class="radio-btn" data-value="true">是</button>
+                            <button type="button" class="radio-btn active" data-value="false">否</button>
+                        </div>
+                        <input type="hidden" id="isFull" value="false">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="chargingAmount"><i class="fas fa-bolt"></i> 充电量 (度)</label>
+                        <input type="number" id="chargingAmount" step="0.01" placeholder="输入2项自动计算">
+                    </div>
+                    <div class="form-group">
+                        <label for="electricityPrice"><i class="fas fa-tag"></i> 电费单价 (元/度)</label>
+                        <input type="number" id="electricityPrice" step="0.01" placeholder="输入2项自动计算">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="chargingCost"><i class="fas fa-yen-sign"></i> 本次充电费用 (元)</label>
+                        <input type="number" id="chargingCost" step="0.01" placeholder="输入2项自动计算">
+                    </div>
+                </div>
+                <button type="button" class="reset-btn"><i class="fas fa-undo-alt"></i> 输入框归零</button>
+                <button type="submit" class="submit-btn"><i class="fas fa-save"></i> 保存记录</button>
+            </form>
+
+            <!-- 快速文本输入区域 -->
+            <div id="quickInput" class="text-input-area hidden">
+                <div class="input-hint">
+                    <h4><i class="fas fa-info-circle"></i> 快速输入范本：</h4>
+                    <ul>
+                        <li>充电量24度，电费单价1.3元/度</li>
+                        <li>充电量30度，本次充电费用36元</li>
+                        <li>电费单价1.2元/度，本次充电费用36元</li>
+                        <li>日期2026年1月7日，里程1500公里</li>
+                        <li>2026-01-07 1500km 24度 1.3元 31.2元</li>
+                    </ul>
+                </div>
+                <textarea id="quickChargingInput" class="text-input" placeholder="请输入充电记录信息，支持多种格式..."></textarea>
+                <button id="parseChargingBtn" class="text-input-btn">
+                    <i class="fas fa-magic"></i> 自动解析并填充
+                </button>
+            </div>
+
+            <!-- 充电记录列表 -->
+            <div class="records-container">
+                <div class="records-header">
+                    <h3><i class="fas fa-list"></i> 充电记录</h3>
+                    <button class="expand-btn" data-target="charging-records-table">
+                        <i class="fas fa-chevron-down"></i> 展开
+                    </button>
+                </div>
+                <div id="charging-records-table" class="records-table-container hidden">
+                    <table class="records-table">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>里程 (km)</th>
+                                <th>充电量 (度)</th>
+                                <th>单价 (元/度)</th>
+                                <th>费用 (元)</th>
+                                <th>是否充满</th>
+                                <th>电耗 (度/百公里)</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chargingRecords">
+                            <tr>
+                                <td colspan="8" class="empty-state">暂无充电记录</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 停车记录 -->
+        <section id="parking" class="tab-content">
+            <h2><i class="fas fa-parking"></i> 停车</h2>
+            
+            <!-- 录入方式选择 -->
+            <div class="input-method">
+                <button class="method-btn active" data-method="text">
+                    <i class="fas fa-keyboard"></i> 表单输入
+                </button>
+                <button class="method-btn" data-method="quick">
+                    <i class="fas fa-bolt"></i> 快速输入
+                </button>
+            </div>
+
+            <!-- 文字输入表单 -->
+            <form id="parkingForm" class="input-form">
+                <input type="hidden" id="editParkingRecordId" value="">
+                <div id="parkingSuccess" class="success-message">
+                    <i class="fas fa-check-circle"></i> 停车记录保存成功！
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="parkingDate"><i class="far fa-calendar-alt"></i> 日期</label>
+                        <input type="date" id="parkingDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="parkingCost"><i class="fas fa-yen-sign"></i> 停车费用 (元)</label>
+                        <input type="number" id="parkingCost" step="0.01" required>
+                    </div>
+                </div>
+                <button type="button" class="reset-btn"><i class="fas fa-undo-alt"></i> 输入框归零</button>
+                <button type="submit" class="submit-btn"><i class="fas fa-save"></i> 保存记录</button>
+            </form>
+
+            <!-- 快速文本输入区域 -->
+            <div id="parkingQuickInput" class="text-input-area hidden">
+                <div class="input-hint">
+                    <h4><i class="fas fa-info-circle"></i> 快速输入范本：</h4>
+                    <ul>
+                        <li>停车费15元</li>
+                        <li>2026年1月7日 停车费20元</li>
+                        <li>2026/01/07 停车费10元</li>
+                        <li>2026-01-07 10元</li>
+                        <li>15元 (自动使用今天日期)</li>
+                    </ul>
+                </div>
+                <textarea id="quickParkingInput" class="text-input" placeholder="请输入停车记录信息，支持多种格式..."></textarea>
+                <button id="parseParkingBtn" class="text-input-btn">
+                    <i class="fas fa-magic"></i> 自动解析并填充
+                </button>
+            </div>
+
+            <!-- 停车记录列表 -->
+            <div class="records-container">
+                <div class="records-header">
+                    <h3><i class="fas fa-list"></i> 停车记录</h3>
+                    <button class="expand-btn" data-target="parking-records-table">
+                        <i class="fas fa-chevron-down"></i> 展开
+                    </button>
+                </div>
+                <div id="parking-records-table" class="records-table-container hidden">
+                    <table class="records-table">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>费用 (元)</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="parkingRecords">
+                            <tr>
+                                <td colspan="3" class="empty-state">暂无停车记录</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 详细统计 -->
+        <section id="statistics" class="tab-content">
+            <h2><i class="fas fa-chart-bar"></i> 统计</h2>
+            
+            <!-- 图表容器 -->
+            <div class="charts-container">
+                <div class="chart-wrapper">
+                    <h3><i class="fas fa-chart-line"></i> 电耗趋势</h3>
+                    <canvas id="electricityChart"></canvas>
+                </div>
+                <div class="chart-wrapper cost-chart-wrapper">
+                    <h3><i class="fas fa-chart-pie"></i> 费用构成</h3>
+                    <!-- 增加统计方式切换按钮 -->
+                    <div class="time-selector" style="margin-bottom: 15px;">
+                        <button class="time-btn" data-time="year">年</button>
+                        <button class="time-btn active" data-time="total">全部</button>
+                    </div>
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+
+
+        </section>
+    </div>
+
+    <script>
+        // 数据存储类
+        class DataStorage {
+            static getChargingRecords() {
+                const records = localStorage.getItem('chargingRecords');
+                return records ? JSON.parse(records) : [];
+            }
+
+            static saveChargingRecords(records) {
+                localStorage.setItem('chargingRecords', JSON.stringify(records));
+            }
+
+            static getParkingRecords() {
+                const records = localStorage.getItem('parkingRecords');
+                return records ? JSON.parse(records) : [];
+            }
+
+            static saveParkingRecords(records) {
+                localStorage.setItem('parkingRecords', JSON.stringify(records));
+            }
+        }
+
+        // 工具函数
+        class Utils {
+            static formatDate(date) {
+                let d;
+                
+                // 检查是否为Excel日期序列号（数字格式）
+                if (typeof date === 'number') {
+                    // Excel日期序列号是从1899年12月30日开始计算的天数
+                    // 处理Excel日期序列号
+                    d = new Date(Date.UTC(1899, 11, 30) + date * 24 * 60 * 60 * 1000);
+                } else {
+                    // 正常日期格式
+                    d = new Date(date);
+                }
+                
+                // 检查日期是否有效
+                if (isNaN(d.getTime())) {
+                    // 如果日期无效，返回原始日期
+                    return date;
+                }
+                
+                const year = d.getFullYear(); // 获取完整年份
+                const month = d.getMonth() + 1; // 月份从0开始，需要加1
+                const day = d.getDate();
+                return `${year}年${month}月${day}日`;
+            }
+
+            static getCurrentMonth() {
+                const now = new Date();
+                return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            }
+
+            static getCurrentYear() {
+                return new Date().getFullYear().toString();
+            }
+
+            static isCurrentMonth(date) {
+                const recordDate = new Date(date);
+                const currentDate = new Date();
+                return recordDate.getFullYear() === currentDate.getFullYear() &&
+                       recordDate.getMonth() === currentDate.getMonth();
+            }
+
+            static isCurrentYear(date) {
+                const recordDate = new Date(date);
+                return recordDate.getFullYear() === new Date().getFullYear();
+            }
+
+            static isInLastWeek(date) {
+                const recordDate = new Date(date);
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                return recordDate >= oneWeekAgo;
+            }
+
+            static isInLastMonth(date) {
+                const recordDate = new Date(date);
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth();
+                
+                // 本月第一天 00:00:00
+                const monthStart = new Date(year, month, 1);
+                
+                return recordDate >= monthStart;
+            }
+
+            static isInLastYear(date) {
+                const recordDate = new Date(date);
+                const now = new Date();
+                const year = now.getFullYear();
+                
+                // 本年第一天 00:00:00
+                const yearStart = new Date(year, 0, 1);
+                
+                return recordDate >= yearStart;
+            }
+
+            // 从文本中提取数字
+            static extractNumber(text) {
+                const match = text.match(/[\d.]+/);
+                return match ? parseFloat(match[0]) : null;
+            }
+
+            // 从文本中提取日期（支持多种格式）
+            static extractDate(text) {
+                // 匹配 YYYY-MM-DD 格式
+                let match = text.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                if (match) {
+                    const year = parseInt(match[1]);
+                    const month = parseInt(match[2]) - 1;
+                    const day = parseInt(match[3]);
+                    return new Date(year, month, day).toISOString().split('T')[0];
+                }
+
+                // 匹配 YYYY年MM月DD日 格式
+                match = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+                if (match) {
+                    const year = parseInt(match[1]);
+                    const month = parseInt(match[2]) - 1;
+                    const day = parseInt(match[3]);
+                    return new Date(year, month, day).toISOString().split('T')[0];
+                }
+
+                // 如果没有找到日期，返回今天
+                return new Date().toISOString().split('T')[0];
+            }
+        }
+
+        // 电耗计算类
+        class ElectricityCalculator {
+            static calculateElectricityPer100km(records, timeRange) {
+                // 按日期排序所有记录
+                const allRecords = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                // 找出所有充满的记录
+                const fullChargingRecords = allRecords.filter(record => record.isFull);
+                
+                if (fullChargingRecords.length < 2) return 0;
+
+                // 取出最近两次充满的记录
+                const prevFull = fullChargingRecords[fullChargingRecords.length - 2];
+                const currFull = fullChargingRecords[fullChargingRecords.length - 1];
+
+                // 找出在上一次充满之后到最近一次充满之间的所有充电记录（包括最近一次）
+                const recordsBetweenFull = allRecords.filter(record => {
+                    const recordDate = new Date(record.date);
+                    const prevFullDate = new Date(prevFull.date);
+                    const currFullDate = new Date(currFull.date);
+                    return recordDate > prevFullDate && recordDate <= currFullDate;
+                });
+
+                // 计算这些记录的总电量
+                const totalElectricity = recordsBetweenFull.reduce((sum, record) => sum + parseFloat(record.amount || 0), 0);
+                
+                // 计算里程差
+                const mileageDiff = currFull.mileage - prevFull.mileage;
+                
+                if (mileageDiff <= 0) return 0;
+                
+                // 计算百公里电耗
+                return (totalElectricity / mileageDiff * 100).toFixed(2);
+            }
+
+            static calculateTotalChargingFee(records, timeRange) {
+                let filteredRecords = [...records];
+                
+                if (timeRange === 'month') {
+                    filteredRecords = records.filter(record => Utils.isCurrentMonth(record.date));
+                } else if (timeRange === 'year') {
+                    filteredRecords = records.filter(record => Utils.isCurrentYear(record.date));
+                }
+
+                return filteredRecords.reduce((sum, record) => sum + parseFloat(record.cost), 0).toFixed(2);
+            }
+
+            static calculateTotalDays(records, timeRange) {
+                if (records.length === 0) return 0;
+                
+                // 根据时间范围过滤记录
+                let filteredRecords = [...records];
+                if (timeRange === 'month') {
+                    filteredRecords = records.filter(record => Utils.isCurrentMonth(record.date));
+                } else if (timeRange === 'year') {
+                    filteredRecords = records.filter(record => Utils.isCurrentYear(record.date));
+                }
+                // 全部：使用所有充电记录，不需要过滤
+                
+                if (filteredRecords.length === 0) return 0;
+                
+                // 按日期排序过滤后的记录
+                filteredRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
+                
+                // 获取时间范围内的最后一条记录
+                const lastRecord = filteredRecords[filteredRecords.length - 1];
+                const lastRecordDate = new Date(lastRecord.date);
+                
+                const currentDate = new Date();
+                
+                if (timeRange === 'month') {
+                    // 计算当月天数：从1号到最后一次充电记录的日期天数
+                    // 例如：最后一次充电记录是1月11日，总天数是11天
+                    return lastRecordDate.getDate();
+                } else if (timeRange === 'year') {
+                    // 计算当年天数：从1月1号到最后一次充电记录的日期
+                    const startOfYear = new Date(currentDate.getFullYear(), 0, 1);
+                    const timeDiff = lastRecordDate - startOfYear;
+                    return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+                } else {
+                    // 全部时间范围：从最早记录到最后一次充电记录的总天数
+                    const earliestDate = new Date(Math.min(...filteredRecords.map(record => new Date(record.date))));
+                    const timeDiff = lastRecordDate - earliestDate;
+                    return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+                }
+            }
+
+            static calculateTotalMileage(records, timeRange) {
+                let filteredRecords = [...records];
+                
+                if (timeRange === 'month') {
+                    filteredRecords = records.filter(record => Utils.isCurrentMonth(record.date));
+                } else if (timeRange === 'year') {
+                    filteredRecords = records.filter(record => Utils.isCurrentYear(record.date));
+                }
+
+                if (filteredRecords.length < 2) return 0;
+
+                filteredRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
+                return filteredRecords[filteredRecords.length - 1].mileage - filteredRecords[0].mileage;
+            }
+
+            static calculateFullChargeCount(records, timeRange) {
+                let filteredRecords = [...records];
+                
+                if (timeRange === 'month') {
+                    filteredRecords = records.filter(record => Utils.isCurrentMonth(record.date));
+                } else if (timeRange === 'year') {
+                    filteredRecords = records.filter(record => Utils.isCurrentYear(record.date));
+                }
+
+                return filteredRecords.filter(record => record.isFull).length;
+            }
+
+            static calculateTotalElectricity(records, timeRange) {
+                let filteredRecords = [...records];
+                
+                if (timeRange === 'month') {
+                    filteredRecords = records.filter(record => Utils.isCurrentMonth(record.date));
+                } else if (timeRange === 'year') {
+                    filteredRecords = records.filter(record => Utils.isCurrentYear(record.date));
+                }
+
+                return filteredRecords.reduce((sum, record) => sum + parseFloat(record.amount || 0), 0).toFixed(2);
+            }
+
+            static calculateCostPerKm(records, parkingRecords, timeRange) {
+                // 1. 根据时间范围过滤充电记录，用于计算总充电金额
+                let filteredRecordsForFee = [...records];
+                
+                // 根据时间范围筛选用于计算费用的记录
+                if (timeRange === 'month') {
+                    // 当月：只保留当前月份的充电记录
+                    filteredRecordsForFee = records.filter(record => Utils.isCurrentMonth(record.date));
+                } else if (timeRange === 'year') {
+                    // 今年：只保留当前年份的充电记录
+                    filteredRecordsForFee = records.filter(record => Utils.isCurrentYear(record.date));
+                }
+                // 全部：使用所有充电记录，不需要过滤
+                
+                // 2. 核查是否有有效的充电数据
+                if (filteredRecordsForFee.length === 0) {
+                    return 0; // 没有数据时返回0
+                }
+                
+                // 3. 计算时间范围内的总充电金额
+                // - 本月情况下：叠加当月全部充电金额
+                // - 今年情况下：叠加当年全部充电金额
+                // - 全部情况下：叠加全部充电金额
+                const totalChargingFee = filteredRecordsForFee.reduce((sum, record) => {
+                    return sum + parseFloat(record.cost || 0);
+                }, 0);
+                
+                // 4. 计算里程差
+                let mileageDiff = 0;
+                
+                // 获取所有记录中公里数最大的记录（定义为最后一条里程）
+                const allRecords = [...records];
+                allRecords.sort((a, b) => parseFloat(b.mileage) - parseFloat(a.mileage)); // 按里程数降序排序
+                const maxMileageRecord = allRecords[0]; // 公里数最大的记录
+                
+                if (timeRange === 'month') {
+                    // 本月：所有记录中公里数最大的里程数减去上月最后一条记录的里程数
+                    const currentDate = new Date();
+                    let lastMonth = currentDate.getMonth() - 1;
+                    let lastMonthYear = currentDate.getFullYear();
+                    
+                    // 处理1月的情况，上月是去年12月
+                    if (lastMonth === -1) {
+                        lastMonth = 11; // 12月
+                        lastMonthYear = currentDate.getFullYear() - 1;
+                    }
+                    
+                    // 过滤出上月的充电记录
+                    const lastMonthRecords = records.filter(record => {
+                        const recordDate = new Date(record.date);
+                        return recordDate.getMonth() === lastMonth && recordDate.getFullYear() === lastMonthYear;
+                    });
+                    
+                    if (lastMonthRecords.length > 0) {
+                        // 上月有记录，使用上月公里数最大的记录的里程数
+                        lastMonthRecords.sort((a, b) => parseFloat(b.mileage) - parseFloat(a.mileage)); // 按里程数降序排序
+                        const lastMonthMaxRecord = lastMonthRecords[0];
+                        mileageDiff = maxMileageRecord.mileage - lastMonthMaxRecord.mileage;
+                    } else {
+                        // 上月没有记录，使用所有记录中公里数最小的记录的里程数
+                        const minMileageRecord = allRecords[allRecords.length - 1]; // 公里数最小的记录
+                        mileageDiff = maxMileageRecord.mileage - minMileageRecord.mileage;
+                    }
+                } else if (timeRange === 'year') {
+                    // 今年：所有记录中公里数最大的里程数减去去年最后一条记录的里程数
+                    const lastYear = new Date().getFullYear() - 1;
+                    
+                    // 过滤出去年的充电记录
+                    const lastYearRecords = records.filter(record => {
+                        const recordDate = new Date(record.date);
+                        return recordDate.getFullYear() === lastYear;
+                    });
+                    
+                    if (lastYearRecords.length > 0) {
+                        // 去年有记录，使用去年公里数最大的记录的里程数
+                        lastYearRecords.sort((a, b) => parseFloat(b.mileage) - parseFloat(a.mileage)); // 按里程数降序排序
+                        const lastYearMaxRecord = lastYearRecords[0];
+                        mileageDiff = maxMileageRecord.mileage - lastYearMaxRecord.mileage;
+                    } else {
+                        // 去年没有记录，使用所有记录中公里数最小的记录的里程数
+                        const minMileageRecord = allRecords[allRecords.length - 1]; // 公里数最小的记录
+                        mileageDiff = maxMileageRecord.mileage - minMileageRecord.mileage;
+                    }
+                } else {
+                    // 全部：所有记录中公里数最大的里程数减去公里数最小的里程数
+                    const minMileageRecord = allRecords[allRecords.length - 1]; // 公里数最小的记录
+                    mileageDiff = maxMileageRecord.mileage - minMileageRecord.mileage;
+                }
+                
+                // 5. 避免除以0，确保结果有效
+                if (mileageDiff <= 0) {
+                    return 0;
+                }
+                
+                // 6. 计算每公里费用：总充电金额 / 里程差
+                const costPerKm = totalChargingFee / mileageDiff;
+                
+                // 7. 保留2位小数并返回结果
+                return costPerKm.toFixed(2);
+            }
+
+            static calculateCostPerDay(records, parkingRecords, timeRange) {
+                // 1. 辅助函数：计算两个日期之间的日历天数（起始日期当天不计入计算）
+                const calculateDaysBetween = (startDate, endDate) => {
+                    // 确保日期对象
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
+                    
+                    // 设置时间为00:00:00，避免时间差异影响天数计算
+                    start.setHours(0, 0, 0, 0);
+                    end.setHours(0, 0, 0, 0);
+                    
+                    // 计算时间差（毫秒）并转换为天数
+                    const timeDiff = end - start;
+                    // 起始日期当天不计入计算，所以不需要+1
+                    const days = timeDiff / (1000 * 3600 * 24);
+                    return Math.max(0, days); // 确保返回值不小于0
+                };
+                
+                // 2. 确保有记录
+                if (records.length === 0 && parkingRecords.length === 0) return "0.00";
+                
+                // 3. 计算总费用
+                // 充电总费用
+                const totalChargingFee = parseFloat(ElectricityCalculator.calculateTotalChargingFee(records, timeRange));
+                // 停车总费用
+                const totalParkingFee = parseFloat(ParkingCalculator.calculateTotalParkingFee(parkingRecords, timeRange));
+                // 总费用
+                const totalFee = totalChargingFee + totalParkingFee;
+                
+                // 4. 获取当前时间范围的最后一条记录日期
+                // 合并所有充电和停车记录，找到当前时间范围内的最晚日期
+                let currentRangeRecords = [];
+                records.forEach(record => {
+                    if (timeRange === 'total' || 
+                        (timeRange === 'month' && Utils.isCurrentMonth(record.date)) || 
+                        (timeRange === 'year' && Utils.isCurrentYear(record.date))) {
+                        currentRangeRecords.push(new Date(record.date));
+                    }
+                });
+                parkingRecords.forEach(record => {
+                    if (timeRange === 'total' || 
+                        (timeRange === 'month' && Utils.isCurrentMonth(record.date)) || 
+                        (timeRange === 'year' && Utils.isCurrentYear(record.date))) {
+                        currentRangeRecords.push(new Date(record.date));
+                    }
+                });
+                currentRangeRecords.sort((a, b) => a - b);
+                const currentRangeLastDate = currentRangeRecords[currentRangeRecords.length - 1];
+                
+                // 5. 计算日历天数
+                let totalDays = 0;
+                
+                if (timeRange === 'total') {
+                    // 全部：所有记录的最早日期至最晚日期的天数
+                    // 合并所有充电和停车记录的日期
+                    let allRecordsDates = [];
+                    records.forEach(record => allRecordsDates.push(new Date(record.date)));
+                    parkingRecords.forEach(record => allRecordsDates.push(new Date(record.date)));
+                    allRecordsDates.sort((a, b) => a - b);
+                    const allRecordsFirstDate = allRecordsDates[0];
+                    const allRecordsLastDate = allRecordsDates[allRecordsDates.length - 1];
+                    totalDays = calculateDaysBetween(allRecordsFirstDate, allRecordsLastDate);
+                } else if (timeRange === 'month') {
+                    // 本月：上月最后一条记录日期至本月记录的最晚日期的天数
+                    // 过滤出上月的记录，同时考虑充电记录和停车记录
+                    const currentDate = new Date();
+                    let lastMonth = currentDate.getMonth() - 1;
+                    let lastMonthYear = currentDate.getFullYear();
+                    
+                    // 处理1月的情况，上月是去年12月
+                    if (lastMonth === -1) {
+                        lastMonth = 11; // 12月
+                        lastMonthYear = currentDate.getFullYear() - 1;
+                    }
+                    
+                    let lastMonthRecords = [];
+                    
+                    // 添加上月的充电记录
+                    records.forEach(record => {
+                        const recordDate = new Date(record.date);
+                        if (recordDate.getMonth() === lastMonth && recordDate.getFullYear() === lastMonthYear) {
+                            lastMonthRecords.push(recordDate);
+                        }
+                    });
+                    
+                    // 添加上月的停车记录
+                    parkingRecords.forEach(record => {
+                        const recordDate = new Date(record.date);
+                        if (recordDate.getMonth() === lastMonth && recordDate.getFullYear() === lastMonthYear) {
+                            lastMonthRecords.push(recordDate);
+                        }
+                    });
+                    
+                    // 确定起始日期
+                    let startDate;
+                    if (lastMonthRecords.length > 0) {
+                        // 有上月记录，使用上月最后一条记录的日期
+                        lastMonthRecords.sort((a, b) => a - b);
+                        startDate = lastMonthRecords[lastMonthRecords.length - 1];
+                    } else {
+                        // 没有上月记录，使用所有记录中的最早一条记录的日期
+                        let allRecordsDates = [];
+                        records.forEach(record => allRecordsDates.push(new Date(record.date)));
+                        parkingRecords.forEach(record => allRecordsDates.push(new Date(record.date)));
+                        allRecordsDates.sort((a, b) => a - b);
+                        startDate = allRecordsDates[0];
+                    }
+                    
+                    // 计算天数
+                    totalDays = calculateDaysBetween(startDate, currentRangeLastDate);
+                } else if (timeRange === 'year') {
+                    // 今年：去年最后一条记录日期至今年记录的最晚日期的天数
+                    // 过滤出去年的记录，同时考虑充电记录和停车记录
+                    const lastYear = new Date().getFullYear() - 1;
+                    
+                    let lastYearRecords = [];
+                    
+                    // 添加去年的充电记录
+                    records.forEach(record => {
+                        const recordDate = new Date(record.date);
+                        if (recordDate.getFullYear() === lastYear) {
+                            lastYearRecords.push(recordDate);
+                        }
+                    });
+                    
+                    // 添加去年的停车记录
+                    parkingRecords.forEach(record => {
+                        const recordDate = new Date(record.date);
+                        if (recordDate.getFullYear() === lastYear) {
+                            lastYearRecords.push(recordDate);
+                        }
+                    });
+                    
+                    // 确定起始日期
+                    let startDate;
+                    if (lastYearRecords.length > 0) {
+                        // 有去年记录，使用去年最后一条记录的日期
+                        lastYearRecords.sort((a, b) => a - b);
+                        startDate = lastYearRecords[lastYearRecords.length - 1];
+                    } else {
+                        // 没有去年记录，使用所有记录中的最早一条记录的日期
+                        let allRecordsDates = [];
+                        records.forEach(record => allRecordsDates.push(new Date(record.date)));
+                        parkingRecords.forEach(record => allRecordsDates.push(new Date(record.date)));
+                        allRecordsDates.sort((a, b) => a - b);
+                        startDate = allRecordsDates[0];
+                    }
+                    
+                    // 计算天数
+                    totalDays = calculateDaysBetween(startDate, currentRangeLastDate);
+                }
+                
+                // 6. 避免除以0
+                if (totalDays <= 0 || isNaN(totalDays)) {
+                    return "0.00";
+                }
+                
+                // 7. 计算每天费用
+                const costPerDay = totalFee / totalDays;
+                return costPerDay.toFixed(2);
+            }
+        }
+
+        // 停车费计算类
+        class ParkingCalculator {
+            static calculateTotalParkingFee(records, timeRange) {
+                let filteredRecords = [...records];
+                
+                if (timeRange === 'month') {
+                    filteredRecords = records.filter(record => Utils.isCurrentMonth(record.date));
+                } else if (timeRange === 'year') {
+                    filteredRecords = records.filter(record => Utils.isCurrentYear(record.date));
+                }
+
+                return filteredRecords.reduce((sum, record) => sum + parseFloat(record.cost), 0).toFixed(2);
+            }
+        }
+
+        // 文本解析器
+        class TextParser {
+            // 解析充电记录文本
+            static parseChargingText(text) {
+                const result = {
+                    date: null,
+                    mileage: null,
+                    amount: null,
+                    price: null,
+                    cost: null,
+                    isFull: false
+                };
+
+                // 提取日期
+                result.date = Utils.extractDate(text);
+
+                // 提取里程（支持km或公里）
+                const mileageMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:km|公里|千米)/i);
+                if (mileageMatch) {
+                    result.mileage = parseFloat(mileageMatch[1]);
+                }
+
+                // 提取充电量（支持度或kWh）
+                const amountMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:度|kwh)/i);
+                if (amountMatch) {
+                    result.amount = parseFloat(amountMatch[1]);
+                }
+
+                // 提取电费单价
+                const priceMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:元\/度|元每度|元每千瓦时)/i);
+                if (priceMatch) {
+                    result.price = parseFloat(priceMatch[1]);
+                } else {
+                    // 尝试其他格式
+                    const priceMatch2 = text.match(/单价\s*(\d+(?:\.\d+)?)/i);
+                    if (priceMatch2) {
+                        result.price = parseFloat(priceMatch2[1]);
+                    }
+                }
+
+                // 提取充电费用
+                const costMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:元|费用)/i);
+                if (costMatch) {
+                    result.cost = parseFloat(costMatch[1]);
+                }
+
+                // 如果文本中包含"未充满"或"没充满"，则设置isFull为false
+                if (text.includes('未充满') || text.includes('没充满') || text.includes('不满')) {
+                    result.isFull = false;
+                }
+
+                return result;
+            }
+
+            // 解析停车记录文本
+            static parseParkingText(text) {
+                const result = {
+                    date: null,
+                    cost: null
+                };
+
+                // 提取日期
+                result.date = Utils.extractDate(text);
+
+                // 提取停车费用
+                let costMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:元|费用)/i);
+                if (costMatch) {
+                    result.cost = parseFloat(costMatch[1]);
+                } else {
+                    // 如果没有找到费用，尝试提取纯数字
+                    const number = Utils.extractNumber(text);
+                    if (number) {
+                        result.cost = number;
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        // 主应用类
+        class CarExpenseTracker {
+            constructor() {
+                this.currentTimeRange = 'month';
+                this.costTimeRange = 'total'; // 费用构成统计方式：year或total，默认改为全部
+                this.chargingChart = null;
+                this.costChart = null;
+                this.init();
+            }
+
+            init() {
+                this.setDefaultDate();
+                this.setupEventListeners();
+                this.render();
+            }
+
+            setDefaultDate() {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('chargingDate').value = today;
+                document.getElementById('parkingDate').value = today;
+            }
+
+            setupEventListeners() {
+                // 导航切换
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        this.switchTab(e.target.closest('.nav-tab').dataset.tab);
+                    });
+                });
+
+                // 时间选择器（仪表盘）
+                document.querySelectorAll('#dashboard .time-selector [data-time]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.switchTimeRange(e.target.dataset.time);
+                    });
+                });
+
+                // 费用构成统计方式切换 - 使用事件委托
+                document.addEventListener('click', (e) => {
+                    const target = e.target.closest('.cost-chart-wrapper .time-selector [data-time]');
+                    if (target) {
+                        this.switchCostTimeRange(target.dataset.time);
+                    }
+                });
+
+                // 充电记录表单提交
+                document.getElementById('chargingForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addChargingRecord();
+                });
+
+                // 停车记录表单提交
+                document.getElementById('parkingForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addParkingRecord();
+                });
+
+                // 充电表单自动计算
+                this.setupChargingFormAutoCalculate();
+
+                // 录入方式切换
+                this.setupInputMethodSwitch();
+
+                // 快速文本输入
+                this.setupQuickInput();
+
+                // Excel导出导入
+                this.setupExcelExportImport();
+
+                // 按钮选择组事件监听
+                this.setupRadioGroupListeners();
+
+                // 为表单添加归零按钮事件
+                this.setupResetButtons();
+
+                // 展开/收起按钮事件监听
+                this.setupExpandButtons();
+            }
+
+            setupExpandButtons() {
+                // 添加展开/收起按钮事件监听
+                document.querySelectorAll('.expand-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const targetId = btn.dataset.target;
+                        const targetElement = document.getElementById(targetId);
+                        
+                        if (targetElement) {
+                            targetElement.classList.toggle('hidden');
+                            btn.classList.toggle('expanded');
+                            
+                            // 更新按钮文本
+                            if (btn.classList.contains('expanded')) {
+                                btn.innerHTML = '<i class="fas fa-chevron-down"></i> 收起';
+                            } else {
+                                btn.innerHTML = '<i class="fas fa-chevron-down"></i> 展开';
+                            }
+                        }
+                    });
+                });
+            }
+
+            setupRadioGroupListeners() {
+                // 为充电记录表单中的是否充满按钮组添加事件监听
+                const radioBtns = document.querySelectorAll('.radio-btn');
+                radioBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.handleRadioButtonClick(e.target);
+                    });
+                });
+            }
+
+            handleRadioButtonClick(btn) {
+                const radioGroup = btn.closest('.radio-group');
+                const hiddenInput = radioGroup.nextElementSibling;
+                
+                // 移除所有按钮的active类
+                radioGroup.querySelectorAll('.radio-btn').forEach(b => b.classList.remove('active'));
+                
+                // 为当前点击的按钮添加active类
+                btn.classList.add('active');
+                
+                // 更新隐藏输入框的值
+                hiddenInput.value = btn.dataset.value;
+            }
+
+            setupChargingFormAutoCalculate() {
+                const amountInput = document.getElementById('chargingAmount');
+                const priceInput = document.getElementById('electricityPrice');
+                const costInput = document.getElementById('chargingCost');
+
+                // 防抖函数：延迟执行计算，直到用户停止输入一段时间
+                const debounce = (func, delay) => {
+                    let timeoutId;
+                    return function(...args) {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => func.apply(this, args), delay);
+                    };
+                };
+
+                // 计算函数：根据任意两个输入自动计算第三个
+                const calculate = () => {
+                    // 获取当前输入值
+                    const amountValue = amountInput.value.trim();
+                    const priceValue = priceInput.value.trim();
+                    const costValue = costInput.value.trim();
+
+                    // 转换为数字，空字符串或无效值转换为null
+                    const amount = amountValue ? parseFloat(amountValue) : null;
+                    const price = priceValue ? parseFloat(priceValue) : null;
+                    const cost = costValue ? parseFloat(costValue) : null;
+
+                    // 检查哪些输入有有效值
+                    const hasAmount = amount !== null && !isNaN(amount);
+                    const hasPrice = price !== null && !isNaN(price);
+                    const hasCost = cost !== null && !isNaN(cost);
+                    
+                    // 确定哪个输入框是当前正在输入的（如果只有一个输入框为空）
+                    const emptyInputs = [];
+                    if (!hasAmount) emptyInputs.push('amount');
+                    if (!hasPrice) emptyInputs.push('price');
+                    if (!hasCost) emptyInputs.push('cost');
+                    
+                    // 只有当有且仅有一个输入框为空时，才执行计算
+                    if (emptyInputs.length === 1) {
+                        const targetInput = emptyInputs[0];
+                        
+                        // 根据需要计算的输入框类型执行计算
+                        switch (targetInput) {
+                            case 'cost':
+                                // 第一种：输入充电量和电费单价 → 计算本次充电费用
+                                if (hasAmount && hasPrice) {
+                                    costInput.value = (amount * price).toFixed(2);
+                                }
+                                break;
+                            case 'price':
+                                // 第二种：输入充电量和本次充电费用 → 计算电费单价
+                                if (hasAmount && hasCost) {
+                                    // 避免除以0
+                                    if (amount !== 0) {
+                                        priceInput.value = (cost / amount).toFixed(2);
+                                    } else {
+                                        priceInput.value = '0.00';
+                                    }
+                                }
+                                break;
+                            case 'amount':
+                                // 第三种：输入本次充电费用和电费单价 → 计算充电量
+                                if (hasCost && hasPrice) {
+                                    // 避免除以0
+                                    if (price !== 0) {
+                                        amountInput.value = (cost / price).toFixed(2);
+                                    } else {
+                                        amountInput.value = '0.00';
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                };
+
+                // 创建防抖版本的计算函数，延迟500毫秒执行
+                const debouncedCalculate = debounce(calculate, 500);
+
+                // 为所有三个输入框添加事件监听
+                const inputs = [amountInput, priceInput, costInput];
+                inputs.forEach(input => {
+                    // 只在失焦时执行计算，避免输入过程中触发
+                    input.addEventListener('blur', calculate);
+                });
+
+                // 添加键盘事件监听，按下Enter键时执行计算
+                document.getElementById('chargingForm').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        calculate();
+                    }
+                });
+
+                // 添加防止完全删除功能
+                amountInput.addEventListener('keydown', (e) => {
+                    // 当按下删除键或退格键，且输入框只有一个字符时，阻止默认行为
+                    if ((e.key === 'Delete' || e.key === 'Backspace') && amountInput.value.length === 1) {
+                        e.preventDefault();
+                        // 保留0值
+                        amountInput.value = '0';
+                    }
+                });
+
+                // 添加输入验证，确保不会为空
+                amountInput.addEventListener('input', () => {
+                    if (amountInput.value === '' || amountInput.value === '-') {
+                        amountInput.value = '0';
+                    }
+                });
+            }
+
+            setupResetButtons() {
+                // 充电记录表单归零按钮
+                document.querySelector('#chargingForm .reset-btn').addEventListener('click', () => {
+                    const form = document.getElementById('chargingForm');
+                    const fields = ['chargingDate', 'chargingMileage', 'chargingAmount', 'electricityPrice', 'chargingCost'];
+                    
+                    fields.forEach(fieldId => {
+                        const field = document.getElementById(fieldId);
+                        if (field) {
+                            if (fieldId === 'chargingDate') {
+                                field.value = new Date().toISOString().split('T')[0];
+                            } else {
+                                field.value = '';
+                            }
+                        }
+                    });
+                    
+                    // 重置按钮选择组
+                    const radioGroups = form.querySelectorAll('.radio-group');
+                    radioGroups.forEach(group => {
+                        const activeBtn = group.querySelector('.radio-btn.active');
+                        if (activeBtn) {
+                            activeBtn.classList.remove('active');
+                        }
+                        const falseBtn = group.querySelector('[data-value="false"]');
+                        if (falseBtn) {
+                            falseBtn.classList.add('active');
+                            // 更新隐藏输入字段
+                            const hiddenInput = group.nextElementSibling;
+                            if (hiddenInput) {
+                                hiddenInput.value = 'false';
+                            }
+                        }
+                    });
+
+                    // 隐藏成功消息
+                    document.getElementById('chargingSuccess').style.display = 'none';
+                });
+                
+                // 停车记录表单归零按钮
+                document.querySelector('#parkingForm .reset-btn').addEventListener('click', () => {
+                    const fields = ['parkingDate', 'parkingCost'];
+                    
+                    fields.forEach(fieldId => {
+                        const field = document.getElementById(fieldId);
+                        if (field) {
+                            if (fieldId === 'parkingDate') {
+                                field.value = new Date().toISOString().split('T')[0];
+                            } else {
+                                field.value = '';
+                            }
+                        }
+                    });
+
+                    // 隐藏成功消息
+                    document.getElementById('parkingSuccess').style.display = 'none';
+                });
+            }
+
+            setupInputMethodSwitch() {
+                // 充电记录录入方式切换
+                document.querySelectorAll('#charging [data-method]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const method = btn.dataset.method;
+                        // 更新按钮状态
+                        document.querySelectorAll('#charging .method-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+
+                        if (method === 'text') {
+                            document.getElementById('chargingForm').classList.remove('hidden');
+                            document.getElementById('quickInput').classList.add('hidden');
+                        } else {
+                            document.getElementById('chargingForm').classList.add('hidden');
+                            document.getElementById('quickInput').classList.remove('hidden');
+                        }
+                    });
+                });
+
+                // 停车记录录入方式切换
+                document.querySelectorAll('#parking [data-method]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const method = btn.dataset.method;
+                        // 更新按钮状态
+                        document.querySelectorAll('#parking .method-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+
+                        if (method === 'text') {
+                            document.getElementById('parkingForm').classList.remove('hidden');
+                            document.getElementById('parkingQuickInput').classList.add('hidden');
+                        } else {
+                            document.getElementById('parkingForm').classList.add('hidden');
+                            document.getElementById('parkingQuickInput').classList.remove('hidden');
+                        }
+                    });
+                });
+            }
+
+            setupQuickInput() {
+                // 充电记录快速输入
+                document.getElementById('parseChargingBtn').addEventListener('click', () => {
+                    const text = document.getElementById('quickChargingInput').value.trim();
+                    if (!text) {
+                        alert('请输入充电记录信息');
+                        return;
+                    }
+                    
+                    this.parseChargingText(text);
+                });
+
+                // 停车记录快速输入
+                document.getElementById('parseParkingBtn').addEventListener('click', () => {
+                    const text = document.getElementById('quickParkingInput').value.trim();
+                    if (!text) {
+                        alert('请输入停车记录信息');
+                        return;
+                    }
+                    
+                    this.parseParkingText(text);
+                });
+
+                // 为文本输入框添加回车键支持
+                document.getElementById('quickChargingInput').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        e.preventDefault();
+                        document.getElementById('parseChargingBtn').click();
+                    }
+                });
+
+                document.getElementById('quickParkingInput').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        e.preventDefault();
+                        document.getElementById('parseParkingBtn').click();
+                    }
+                });
+            }
+
+            parseChargingText(text) {
+                const result = TextParser.parseChargingText(text);
+                
+                // 填充表单
+                if (result.date) {
+                    document.getElementById('chargingDate').value = result.date;
+                }
+                
+                if (result.mileage) {
+                    document.getElementById('chargingMileage').value = result.mileage;
+                }
+                
+                if (result.amount) {
+                    document.getElementById('chargingAmount').value = result.amount;
+                }
+                
+                if (result.price) {
+                    document.getElementById('electricityPrice').value = result.price;
+                }
+                
+                if (result.cost) {
+                    document.getElementById('chargingCost').value = result.cost;
+                }
+                
+                // 设置是否充满
+                if (result.isFull === false) {
+                    const radioGroup = document.querySelector('.radio-group');
+                    radioGroup.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
+                    radioGroup.querySelector('[data-value="false"]').classList.add('active');
+                    document.getElementById('isFull').value = 'false';
+                }
+
+                // 触发自动计算
+                document.getElementById('chargingAmount').dispatchEvent(new Event('input'));
+                
+                // 切换到表单输入
+                document.querySelectorAll('#charging .method-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector('#charging [data-method="text"]').classList.add('active');
+                document.getElementById('chargingForm').classList.remove('hidden');
+                document.getElementById('quickInput').classList.add('hidden');
+                
+                // 清空快速输入框
+                document.getElementById('quickChargingInput').value = '';
+                
+                // 显示成功消息
+                const successMsg = document.getElementById('chargingSuccess');
+                successMsg.textContent = '✓ 信息已自动填充到表单中';
+                successMsg.style.display = 'block';
+                
+                // 3秒后隐藏消息
+                setTimeout(() => {
+                    successMsg.style.display = 'none';
+                }, 3000);
+            }
+
+            parseParkingText(text) {
+                const result = TextParser.parseParkingText(text);
+                
+                // 填充表单
+                if (result.date) {
+                    document.getElementById('parkingDate').value = result.date;
+                }
+                
+                if (result.cost) {
+                    document.getElementById('parkingCost').value = result.cost;
+                }
+                
+                // 切换到表单输入
+                document.querySelectorAll('#parking .method-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector('#parking [data-method="text"]').classList.add('active');
+                document.getElementById('parkingForm').classList.remove('hidden');
+                document.getElementById('parkingQuickInput').classList.add('hidden');
+                
+                // 清空快速输入框
+                document.getElementById('quickParkingInput').value = '';
+                
+                // 显示成功消息
+                const successMsg = document.getElementById('parkingSuccess');
+                successMsg.textContent = '✓ 信息已自动填充到表单中';
+                successMsg.style.display = 'block';
+                
+                // 3秒后隐藏消息
+                setTimeout(() => {
+                    successMsg.style.display = 'none';
+                }, 3000);
+            }
+
+            setupExcelExportImport() {
+                // 导出Excel
+                document.getElementById('exportExcel').addEventListener('click', () => {
+                    this.exportToExcel();
+                });
+
+                // 导入Excel
+                document.getElementById('importBtn').addEventListener('click', () => {
+                    document.getElementById('importExcel').click();
+                });
+
+                document.getElementById('importExcel').addEventListener('change', (e) => {
+                    this.importFromExcel(e.target.files[0]);
+                });
+
+                // 数据清零
+                document.getElementById('clearAllData').addEventListener('click', () => {
+                    this.clearAllData();
+                });
+            }
+
+
+
+            async exportToExcel() {
+                const chargingRecords = DataStorage.getChargingRecords();
+                const parkingRecords = DataStorage.getParkingRecords();
+
+                const wb = XLSX.utils.book_new();
+                
+                // 解析中文日期为时间戳的辅助函数
+                const parseChineseDate = (dateStr) => {
+                    if (!dateStr) return 0;
+                    // 处理中文格式日期 "2025年1月14日" 或 ISO格式 "2025-01-14"
+                    const match = dateStr.match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})[日]?/);
+                    if (match) {
+                        const year = parseInt(match[1]);
+                        const month = parseInt(match[2]) - 1;
+                        const day = parseInt(match[3]);
+                        return new Date(year, month, day).getTime();
+                    }
+                    // 尝试直接解析
+                    return new Date(dateStr).getTime() || 0;
+                };
+
+                // 计算每条充电记录的电耗
+                const sortedRecords = [...chargingRecords].sort((a, b) => parseChineseDate(a.date) - parseChineseDate(b.date));
+                const fullRecords = sortedRecords.filter(record => record.isFull);
+                
+                const recordsWithElectricity = sortedRecords.map(record => {
+                    let electricity = 0;
+                    
+                    if (fullRecords.length >= 2) {
+                        // 遍历所有充满记录，找出当前记录所在的充满周期
+                        for (let i = 0; i < fullRecords.length - 1; i++) {
+                            const prevFull = fullRecords[i];
+                            const currFull = fullRecords[i + 1];
+                            
+                            const recordDate = new Date(record.date);
+                            const prevFullDate = new Date(prevFull.date);
+                            const currFullDate = new Date(currFull.date);
+                            
+                            // 检查当前记录是否在这个充满周期内
+                            if (recordDate > prevFullDate && recordDate <= currFullDate) {
+                                // 计算该周期内的所有充电记录（包括当前充满记录）
+                                const periodRecords = sortedRecords.filter(r => {
+                                    const rDate = new Date(r.date);
+                                    return rDate > prevFullDate && rDate <= currFullDate;
+                                });
+                                
+                                const totalElectricity = periodRecords.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+                                const mileageDiff = currFull.mileage - prevFull.mileage;
+                                
+                                if (mileageDiff > 0) {
+                                    electricity = (totalElectricity / mileageDiff * 100);
+                                }
+                                break; // 找到对应的充满周期后跳出循环
+                            }
+                        }
+                    }
+                    
+                    return { ...record, electricity };
+                });
+
+                // 充电记录工作表
+                const chargingData = recordsWithElectricity.map(record => ({
+                    日期: Utils.formatDate(record.date),
+                    里程: Math.round(parseFloat(record.mileage || 0)),
+                    充电量: parseFloat(record.amount || 0).toFixed(2),
+                    电费单价: parseFloat(record.price || 0).toFixed(2),
+                    本次充电总费用: parseFloat(record.cost || 0).toFixed(2),
+                    是否充满: record.isFull ? '是' : '否',
+                    百公里电耗: record.isFull && record.electricity > 0 ? record.electricity.toFixed(2) : ''  
+                }));
+                
+                // 使用json_to_sheet创建工作表，确保样式能正确应用
+                const chargingWs = XLSX.utils.json_to_sheet(chargingData, { skipHeader: true });
+                
+                // 设置充电记录工作表的列宽
+                const chargingCols = [
+                    { wch: 14 }, // 日期（A列固定宽度14）
+                    { wch: 10 }, // 里程
+                    { wch: 10 }, // 充电量
+                    { wch: 12 }, // 电费单价
+                    { wch: 14 }, // 本次充电总费用
+                    { wch: 10 }, // 是否充满
+                    { wch: 14 }  // 百公里电耗
+                ];
+                chargingWs['!cols'] = chargingCols;
+                
+                // 1. 调整现有数据行的行号（向下移动2行，为备注和表头留出空间）
+                const originalRange = XLSX.utils.decode_range(chargingWs['!ref']);
+                const newRange = {
+                    s: { r: originalRange.s.r + 2, c: originalRange.s.c },
+                    e: { r: originalRange.e.r + 2, c: originalRange.e.c }
+                };
+                
+                // 复制现有数据到新位置
+                const tempData = {};
+                for (let r = originalRange.s.r; r <= originalRange.e.r; r++) {
+                    for (let c = originalRange.s.c; c <= originalRange.e.c; c++) {
+                        const originalCell = XLSX.utils.encode_cell({ r: r, c: c });
+                        const newCell = XLSX.utils.encode_cell({ r: r + 2, c: c });
+                        if (chargingWs[originalCell]) {
+                            tempData[newCell] = chargingWs[originalCell];
+                            delete chargingWs[originalCell];
+                        }
+                    }
+                }
+                
+                // 将临时数据写回工作表
+                Object.assign(chargingWs, tempData);
+                
+                // 2. 添加备注行（第1行）
+                const note = '备注：所有单元格格式均为文本/常规格式，否则无法正常导入导出';
+                chargingWs['A1'] = {
+                    v: note,
+                    t: 's',
+                    s: {
+                        font: {
+                            bold: true,
+                            color: { rgb: 'FF0000' }
+                        },
+                        alignment: {
+                            horizontal: 'center',
+                            vertical: 'center'
+                        }
+                    }
+                };
+                
+                // 3. 添加表头行（第2行）
+                const headers = ['日期', '里程', '充电量', '电费单价', '本次充电总费用', '是否充满', '百公里电耗'];
+                headers.forEach((header, index) => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 1, c: index });
+                    chargingWs[cellAddress] = {
+                        v: header,
+                        t: 's',
+                        s: {
+                            font: {
+                                bold: true
+                            },
+                            alignment: {
+                                horizontal: 'center',
+                                vertical: 'center'
+                            },
+                            fill: {
+                                fgColor: { rgb: 'E0E0E0' }
+                            },
+                            border: {
+                                top: { style: 'thin' },
+                                bottom: { style: 'thin' },
+                                left: { style: 'thin' },
+                                right: { style: 'thin' }
+                            }
+                        }
+                    };
+                });
+                
+                // 4. 为数据行添加样式
+                for (let r = newRange.s.r; r <= newRange.e.r; r++) {
+                    for (let c = newRange.s.c; c <= newRange.e.c; c++) {
+                        const cellAddress = XLSX.utils.encode_cell({ r: r, c: c });
+                        if (chargingWs[cellAddress]) {
+                            const cellType = 's'; // 所有列为文本类型
+                            const numFmt = '@'; // 所有列为文本格式
+                            
+                            if (!chargingWs[cellAddress].s) chargingWs[cellAddress].s = {};
+                            chargingWs[cellAddress].t = cellType;
+                            chargingWs[cellAddress].s.alignment = {
+                                horizontal: 'center',
+                                vertical: 'center'
+                            };
+                            chargingWs[cellAddress].s.numFmt = numFmt;
+                            chargingWs[cellAddress].s.border = {
+                                top: { style: 'thin' },
+                                bottom: { style: 'thin' },
+                                left: { style: 'thin' },
+                                right: { style: 'thin' }
+                            };
+                        }
+                    }
+                }
+                
+                // 5. 合并备注行的单元格
+                chargingWs['!merges'] = [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } } // 合并第一行A到G列
+                ];
+                
+                // 6. 更新工作表范围
+                chargingWs['!ref'] = XLSX.utils.encode_range({
+                    s: { r: 0, c: 0 },
+                    e: newRange.e
+                });
+                
+                XLSX.utils.book_append_sheet(wb, chargingWs, '充电记录');
+
+                // 停车记录工作表
+                const parkingData = parkingRecords.map(record => ({
+                    日期: Utils.formatDate(record.date),
+                    停车费用: record.cost
+                }));
+                
+                // 使用json_to_sheet创建工作表，确保样式能正确应用
+                const parkingWs = XLSX.utils.json_to_sheet(parkingData, { skipHeader: true });
+                
+                // 设置停车记录工作表的列宽
+                const parkingCols = [
+                    { wch: 14 }, // 日期（A列固定宽度14）
+                    { wch: 12 }  // 停车费用
+                ];
+                parkingWs['!cols'] = parkingCols;
+                
+                // 1. 调整现有数据行的行号（向下移动2行，为备注和表头留出空间）
+                const parkingOriginalRange = XLSX.utils.decode_range(parkingWs['!ref']);
+                const parkingNewRange = {
+                    s: { r: parkingOriginalRange.s.r + 2, c: parkingOriginalRange.s.c },
+                    e: { r: parkingOriginalRange.e.r + 2, c: parkingOriginalRange.e.c }
+                };
+                
+                // 复制现有数据到新位置
+                const parkingTempData = {};
+                for (let r = parkingOriginalRange.s.r; r <= parkingOriginalRange.e.r; r++) {
+                    for (let c = parkingOriginalRange.s.c; c <= parkingOriginalRange.e.c; c++) {
+                        const originalCell = XLSX.utils.encode_cell({ r: r, c: c });
+                        const newCell = XLSX.utils.encode_cell({ r: r + 2, c: c });
+                        if (parkingWs[originalCell]) {
+                            parkingTempData[newCell] = parkingWs[originalCell];
+                            delete parkingWs[originalCell];
+                        }
+                    }
+                }
+                
+                // 将临时数据写回工作表
+                Object.assign(parkingWs, parkingTempData);
+                
+                // 2. 添加备注行（第1行）
+                const parkingNote = '备注：所有单元格格式均为文本/常规格式，否则无法正常导入导出';
+                parkingWs['A1'] = {
+                    v: parkingNote,
+                    t: 's',
+                    s: {
+                        font: {
+                            bold: true,
+                            color: { rgb: 'FF0000' }
+                        },
+                        alignment: {
+                            horizontal: 'center',
+                            vertical: 'center'
+                        }
+                    }
+                };
+                
+                // 3. 添加表头行（第2行）
+                const parkingHeaders = ['日期', '停车费用'];
+                parkingHeaders.forEach((header, index) => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 1, c: index });
+                    parkingWs[cellAddress] = {
+                        v: header,
+                        t: 's',
+                        s: {
+                            font: {
+                                bold: true
+                            },
+                            alignment: {
+                                horizontal: 'center',
+                                vertical: 'center'
+                            },
+                            fill: {
+                                fgColor: { rgb: 'E0E0E0' }
+                            },
+                            border: {
+                                top: { style: 'thin' },
+                                bottom: { style: 'thin' },
+                                left: { style: 'thin' },
+                                right: { style: 'thin' }
+                            }
+                        }
+                    };
+                });
+                
+                // 4. 为数据行添加样式
+                for (let r = parkingNewRange.s.r; r <= parkingNewRange.e.r; r++) {
+                    for (let c = parkingNewRange.s.c; c <= parkingNewRange.e.c; c++) {
+                        const cellAddress = XLSX.utils.encode_cell({ r: r, c: c });
+                        if (parkingWs[cellAddress]) {
+                            const cellType = 's'; // 所有列为文本类型
+                            const numFmt = '@'; // 所有列为文本格式
+                            
+                            if (!parkingWs[cellAddress].s) parkingWs[cellAddress].s = {};
+                            parkingWs[cellAddress].t = cellType;
+                            parkingWs[cellAddress].s.alignment = {
+                                horizontal: 'center',
+                                vertical: 'center'
+                            };
+                            parkingWs[cellAddress].s.numFmt = numFmt;
+                            parkingWs[cellAddress].s.border = {
+                                top: { style: 'thin' },
+                                bottom: { style: 'thin' },
+                                left: { style: 'thin' },
+                                right: { style: 'thin' }
+                            };
+                        }
+                    }
+                }
+                
+                // 5. 合并备注行的单元格
+                parkingWs['!merges'] = [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } } // 合并第一行A到B列
+                ];
+                
+                // 6. 更新工作表范围
+                parkingWs['!ref'] = XLSX.utils.encode_range({
+                    s: { r: 0, c: 0 },
+                    e: parkingNewRange.e
+                });
+                
+                XLSX.utils.book_append_sheet(wb, parkingWs, '停车记录');
+
+                try {
+                    // 生成带日期的文件名
+                    const now = new Date();
+                    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+                    const fileName = `车辆费用记录_${dateStr}.xlsx`;
+                    
+                    // 尝试使用File System Access API，允许用户选择保存位置
+                    if ('showSaveFilePicker' in window) {
+                        // 显示文件选择器，允许用户选择保存位置
+                        const fileHandle = await window.showSaveFilePicker({
+                            suggestedName: fileName,
+                            types: [
+                                { description: 'Excel文件', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }
+                            ]
+                        });
+
+                        // 创建文件流并写入数据
+                        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+
+                        alert('Excel数据导出成功！');
+                    } else {
+                        // 如果浏览器不支持File System Access API，使用传统的下载方式
+                        XLSX.writeFile(wb, fileName);
+                        alert('Excel数据已下载到浏览器默认下载目录！');
+                    }
+                    
+                    // 保存导出时间到localStorage
+                    localStorage.setItem('lastExportTime', now.toISOString());
+                    // 更新导出信息
+                    this.updateExportInfo();
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        alert('Excel数据导出失败：' + error.message);
+                    }
+                    // 用户取消选择不显示错误
+                }
+            }
+
+            importFromExcel(file) {
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    // 设置读取选项，确保能正确处理不同格式的单元格
+                    const wb = XLSX.read(data, { 
+                        type: 'array',
+                        cellDates: true,  // 将日期格式的单元格转换为Date对象
+                        cellNF: false,     // 不使用数字格式
+                        cellText: true    // 使用文本格式
+                    });
+
+                    // 解析中文日期并转换为ISO格式的辅助函数
+                    const normalizeDate = (dateValue) => {
+                        if (!dateValue) return new Date().toISOString().split('T')[0];
+                        
+                        let dateStr = dateValue;
+                        // 如果是Date对象，转换为字符串
+                        if (dateValue instanceof Date) {
+                            dateStr = dateValue.toISOString().split('T')[0];
+                        } else if (typeof dateValue === 'number') {
+                            // 如果是Excel序列号，转换为Date对象
+                            const date = XLSX.SSF.parse_date_code(dateValue);
+                            if (date) {
+                                return `${date.y}-${String(date.m + 1).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+                            }
+                        }
+                        
+                        // 处理中文格式日期 "2025年1月14日" 或 ISO格式 "2025-01-14"
+                        const match = String(dateStr).match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})[日]?/);
+                        if (match) {
+                            const year = parseInt(match[1]);
+                            const month = parseInt(match[2]);
+                            const day = parseInt(match[3]);
+                            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        }
+                        // 尝试直接解析并转换为ISO格式
+                        const date = new Date(dateStr);
+                        if (!isNaN(date.getTime())) {
+                            return date.toISOString().split('T')[0];
+                        }
+                        // 默认为当前日期
+                        return new Date().toISOString().split('T')[0];
+                    };
+                    
+                    // 安全解析数值的辅助函数
+                    const safeParseFloat = (value) => {
+                        if (value === null || value === undefined || value === '') return 0;
+                        // 如果是字符串，先去除空格和千位分隔符
+                        if (typeof value === 'string') {
+                            value = value.replace(/,/g, '').trim();
+                        }
+                        const parsed = parseFloat(value);
+                        return isNaN(parsed) ? 0 : parsed;
+                    };
+                    
+                    // 读取充电记录
+                    const chargingWs = wb.Sheets['充电记录'];
+                    if (chargingWs) {
+                        // 使用header: 1将第二行作为表头，跳过第一行备注行
+                        const chargingDataArray = XLSX.utils.sheet_to_json(chargingWs, { header: 1 });
+                        // 跳过第一行备注行和第二行表头
+                        chargingDataArray.shift(); // 移除备注行
+                        const headers = chargingDataArray.shift(); // 移除表头行并保存
+                        // 将数组格式转换为对象格式
+                        const chargingData = chargingDataArray.map(row => {
+                            const obj = {};
+                            headers.forEach((header, index) => {
+                                obj[header] = row[index];
+                            });
+                            return obj;
+                        });
+                        const chargingRecords = chargingData.map(record => ({
+                            id: `charging_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                            date: normalizeDate(record.日期),
+                            mileage: safeParseFloat(record.里程),
+                            amount: safeParseFloat(record.充电量),
+                            price: safeParseFloat(record.电费单价),
+                            cost: safeParseFloat(record.本次充电总费用),
+                            isFull: String(record.是否充满).trim() === '是',
+                            // 保留原始电耗数据，后续会重新计算
+                            originalElectricity: safeParseFloat(record.电耗)
+                        }));
+                        DataStorage.saveChargingRecords(chargingRecords);
+                    }
+
+                    // 读取停车记录
+                    const parkingWs = wb.Sheets['停车记录'];
+                    if (parkingWs) {
+                        // 使用header: 1将第二行作为表头，跳过第一行备注行
+                        const parkingDataArray = XLSX.utils.sheet_to_json(parkingWs, { header: 1 });
+                        // 跳过第一行备注行和第二行表头
+                        parkingDataArray.shift(); // 移除备注行
+                        const parkingHeaders = parkingDataArray.shift(); // 移除表头行并保存
+                        // 将数组格式转换为对象格式
+                        const parkingData = parkingDataArray.map(row => {
+                            const obj = {};
+                            parkingHeaders.forEach((header, index) => {
+                                obj[header] = row[index];
+                            });
+                            return obj;
+                        });
+                        const parkingRecords = parkingData.map(record => ({
+                            id: `parking_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                            date: normalizeDate(record.日期),
+                            cost: safeParseFloat(record.停车费用)
+                        }));
+                        DataStorage.saveParkingRecords(parkingRecords);
+                    }
+
+                    this.render();
+                    alert('导入成功！');
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            // 数据清零方法
+            clearAllData() {
+                if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
+                    // 清空所有数据
+                    DataStorage.saveChargingRecords([]);
+                    DataStorage.saveParkingRecords([]);
+                    
+                    // 重新渲染页面
+                    this.render();
+                    
+                    alert('所有数据已成功清空！');
+                }
+            }
+
+            switchTab(tabId) {
+                // 隐藏所有标签内容
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+
+                // 移除所有导航按钮的活动状态
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+
+                // 显示选中的标签内容
+                document.getElementById(tabId).classList.add('active');
+
+                // 激活对应的导航按钮
+                document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+
+                // 如果切换到统计页面，重新渲染图表
+                if (tabId === 'statistics') {
+                    this.renderCharts();
+                }
+            }
+
+            switchTimeRange(timeRange) {
+                this.currentTimeRange = timeRange;
+                
+                // 更新按钮状态
+                document.querySelectorAll('#dashboard .time-selector [data-time]').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.querySelector(`#dashboard .time-selector [data-time="${timeRange}"]`).classList.add('active');
+
+                this.renderDashboard();
+            }
+
+            // 费用构成统计方式切换
+            switchCostTimeRange(timeRange) {
+                this.costTimeRange = timeRange;
+                
+                // 直接重新渲染图表，图表渲染时会根据costTimeRange更新按钮状态
+                this.renderCostChart();
+            }
+
+            addChargingRecord() {
+                const editRecordId = document.getElementById('editRecordId').value;
+                
+                const record = {
+                    date: document.getElementById('chargingDate').value || new Date().toISOString().split('T')[0],
+                    mileage: Math.round(parseFloat(document.getElementById('chargingMileage').value) || 0),
+                    amount: parseFloat(document.getElementById('chargingAmount').value) || 0,
+                    price: parseFloat(document.getElementById('electricityPrice').value) || 0,
+                    cost: parseFloat(document.getElementById('chargingCost').value) || 0,
+                    isFull: document.getElementById('isFull').value === 'true'
+                };
+
+                // 验证必填字段和有效数据
+                if (!record.date || isNaN(record.mileage) || record.mileage <= 0) {
+                    alert('请填写有效的日期和里程信息（里程必须大于0）');
+                    return;
+                }
+
+                // 确保至少有一个数值字段大于0
+                if (record.amount <= 0 && record.price <= 0 && record.cost <= 0) {
+                    alert('请填写有效的充电量、单价或费用信息（至少一个字段必须大于0）');
+                    return;
+                }
+
+                const records = DataStorage.getChargingRecords();
+                
+                if (editRecordId) {
+                    // 修改现有记录
+                    const recordIndex = records.findIndex(r => r.id === editRecordId);
+                    if (recordIndex !== -1) {
+                        records[recordIndex] = {
+                            ...records[recordIndex],
+                            ...record
+                        };
+                        DataStorage.saveChargingRecords(records);
+                        
+                        // 显示成功消息
+                        const successMsg = document.getElementById('chargingSuccess');
+                        successMsg.textContent = '✓ 充电记录修改成功！';
+                        successMsg.style.display = 'block';
+                    }
+                } else {
+                    // 添加新记录
+                    const newRecord = {
+                        id: `charging_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                        ...record
+                    };
+                    records.push(newRecord);
+                    DataStorage.saveChargingRecords(records);
+                    
+                    // 显示成功消息
+                    const successMsg = document.getElementById('chargingSuccess');
+                    successMsg.textContent = '✓ 充电记录保存成功！';
+                    successMsg.style.display = 'block';
+                }
+
+                // 重置表单
+                document.getElementById('chargingForm').reset();
+                this.setDefaultDate();
+                // 重置是否充满按钮选择
+                const radioGroup = document.querySelector('.radio-group');
+                radioGroup.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
+                radioGroup.querySelector('[data-value="false"]').classList.add('active');
+                document.getElementById('isFull').value = 'false';
+                // 清空编辑记录ID
+                document.getElementById('editRecordId').value = '';
+                
+                // 3秒后隐藏消息
+                setTimeout(() => {
+                    document.getElementById('chargingSuccess').style.display = 'none';
+                }, 3000);
+                
+                this.render();
+            }
+
+            addParkingRecord() {
+                const editRecordId = document.getElementById('editParkingRecordId').value;
+                
+                const record = {
+                    date: document.getElementById('parkingDate').value || new Date().toISOString().split('T')[0],
+                    cost: parseFloat(document.getElementById('parkingCost').value) || 0
+                };
+
+                // 验证必填字段和费用有效性
+                if (!record.date || isNaN(record.cost) || record.cost <= 0) {
+                    alert('请填写日期和有效的费用信息（费用必须大于0）');
+                    return;
+                }
+
+                const records = DataStorage.getParkingRecords();
+                
+                if (editRecordId) {
+                    // 修改现有记录
+                    const recordIndex = records.findIndex(r => r.id === editRecordId);
+                    if (recordIndex !== -1) {
+                        records[recordIndex] = {
+                            ...records[recordIndex],
+                            ...record
+                        };
+                        DataStorage.saveParkingRecords(records);
+                        
+                        // 显示成功消息
+                        const successMsg = document.getElementById('parkingSuccess');
+                        successMsg.textContent = '✓ 停车记录修改成功！';
+                        successMsg.style.display = 'block';
+                    }
+                } else {
+                    // 添加新记录
+                    const newRecord = {
+                        id: `parking_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                        ...record
+                    };
+                    records.push(newRecord);
+                    DataStorage.saveParkingRecords(records);
+                    
+                    // 显示成功消息
+                    const successMsg = document.getElementById('parkingSuccess');
+                    successMsg.textContent = '✓ 停车记录保存成功！';
+                    successMsg.style.display = 'block';
+                }
+
+                // 重置表单
+                document.getElementById('parkingForm').reset();
+                this.setDefaultDate();
+                // 清空编辑记录ID
+                document.getElementById('editParkingRecordId').value = '';
+                
+                // 3秒后隐藏消息
+                setTimeout(() => {
+                    document.getElementById('parkingSuccess').style.display = 'none';
+                }, 3000);
+                
+                this.render();
+            }
+
+            editParkingRecord(id) {
+                const records = DataStorage.getParkingRecords();
+                const record = records.find(r => r.id === id);
+                
+                if (record) {
+                    // 填充表单数据
+                    document.getElementById('editParkingRecordId').value = record.id;
+                    document.getElementById('parkingDate').value = record.date;
+                    document.getElementById('parkingCost').value = record.cost;
+                    
+                    // 显示成功消息
+                    const successMsg = document.getElementById('parkingSuccess');
+                    successMsg.textContent = '✎ 正在编辑停车记录...';
+                    successMsg.style.display = 'block';
+                    
+                    // 3秒后隐藏消息
+                    setTimeout(() => {
+                        successMsg.style.display = 'none';
+                    }, 3000);
+                }
+            }
+
+            deleteChargingRecord(id) {
+                if (!confirm('确定要删除这条充电记录吗？')) return;
+                
+                let records = DataStorage.getChargingRecords();
+                records = records.filter(record => record.id != id);
+                DataStorage.saveChargingRecords(records);
+                this.render();
+            }
+
+            editChargingRecord(id) {
+                const records = DataStorage.getChargingRecords();
+                const record = records.find(r => r.id === id);
+                
+                if (record) {
+                    // 填充表单数据
+                    document.getElementById('editRecordId').value = record.id;
+                    document.getElementById('chargingDate').value = record.date;
+                    document.getElementById('chargingMileage').value = record.mileage;
+                    document.getElementById('chargingAmount').value = record.amount;
+                    document.getElementById('electricityPrice').value = record.price;
+                    document.getElementById('chargingCost').value = record.cost;
+                    
+                    // 设置是否充满按钮状态
+                    const radioGroup = document.querySelector('.radio-group');
+                    radioGroup.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
+                    radioGroup.querySelector(`[data-value="${record.isFull}"]`).classList.add('active');
+                    document.getElementById('isFull').value = record.isFull.toString();
+                    
+                    // 显示成功消息
+                    const successMsg = document.getElementById('chargingSuccess');
+                    successMsg.textContent = '✎ 正在编辑充电记录...';
+                    successMsg.style.display = 'block';
+                    
+                    // 3秒后隐藏消息
+                    setTimeout(() => {
+                        successMsg.style.display = 'none';
+                    }, 3000);
+                }
+            }
+
+            deleteParkingRecord(id) {
+                if (!confirm('确定要删除这条停车记录吗？')) return;
+                
+                let records = DataStorage.getParkingRecords();
+                records = records.filter(record => record.id != id);
+                DataStorage.saveParkingRecords(records);
+                this.render();
+            }
+
+            renderDashboard() {
+                const chargingRecords = DataStorage.getChargingRecords();
+                const parkingRecords = DataStorage.getParkingRecords();
+
+                // 更新数据导出提示信息
+                this.updateExportInfo();
+
+                // 计算数据
+                const totalDays = ElectricityCalculator.calculateTotalDays(chargingRecords, this.currentTimeRange);
+                const electricityPer100km = ElectricityCalculator.calculateElectricityPer100km(chargingRecords, this.currentTimeRange);
+                const totalChargingFee = ElectricityCalculator.calculateTotalChargingFee(chargingRecords, this.currentTimeRange);
+                const totalParkingFee = ParkingCalculator.calculateTotalParkingFee(parkingRecords, this.currentTimeRange);
+                
+                // 新增计算
+                const fullChargeCount = ElectricityCalculator.calculateFullChargeCount(chargingRecords, this.currentTimeRange);
+                const totalElectricity = ElectricityCalculator.calculateTotalElectricity(chargingRecords, this.currentTimeRange);
+                const costPerKm = ElectricityCalculator.calculateCostPerKm(chargingRecords, parkingRecords, this.currentTimeRange);
+                const costPerDay = ElectricityCalculator.calculateCostPerDay(chargingRecords, parkingRecords, this.currentTimeRange);
+
+                // 更新DOM
+                document.getElementById('totalDays').innerHTML = `<span>${totalDays}</span><span class="unit">天</span>`;
+                document.getElementById('electricityPer100km').innerHTML = `<span>${electricityPer100km}</span><span class="unit">度/百公里</span>`;
+                document.getElementById('totalChargingFee').innerHTML = `<span>¥${totalChargingFee}</span><span class="unit">元</span>`;
+                document.getElementById('totalParkingFee').innerHTML = `<span>¥${totalParkingFee}</span><span class="unit">元</span>`;
+                document.getElementById('fullChargeCount').innerHTML = `<span>${fullChargeCount}</span><span class="unit">次</span>`;
+                document.getElementById('totalElectricity').innerHTML = `<span>${totalElectricity}</span><span class="unit">度</span>`;
+                document.getElementById('costPerKm').innerHTML = `<span>¥${parseFloat(costPerKm).toFixed(2)}</span><span class="unit">/km</span>`;
+                document.getElementById('costPerDay').innerHTML = `<span>¥${costPerDay}</span><span class="unit">/天</span>`;
+
+                // 概览数据 - 在本月或今年标签时显示
+                const yearlyDataSection = document.querySelector('.yearly-data');
+                if (this.currentTimeRange === 'month' || this.currentTimeRange === 'year') {
+                    this.renderOverviewData();
+                    yearlyDataSection.style.display = 'block';
+                } else {
+                    yearlyDataSection.style.display = 'none';
+                }
+            }
+
+            renderOverviewData() {
+                const chargingRecords = DataStorage.getChargingRecords();
+                const parkingRecords = DataStorage.getParkingRecords();
+
+                // 根据时间范围筛选数据
+                let filteredCharging, filteredParking, title;
+                if (this.currentTimeRange === 'month') {
+                    filteredCharging = chargingRecords.filter(record => Utils.isCurrentMonth(record.date));
+                    filteredParking = parkingRecords.filter(record => Utils.isCurrentMonth(record.date));
+                    title = '本月概览';
+                } else {
+                    filteredCharging = chargingRecords.filter(record => Utils.isCurrentYear(record.date));
+                    filteredParking = parkingRecords.filter(record => Utils.isCurrentYear(record.date));
+                    title = '年度概览';
+                }
+
+                // 更新标题
+                document.querySelector('.yearly-data h2').innerHTML = `<i class="fas fa-chart-line"></i> ${title}`;
+
+                // 计算总里程
+                let totalMileage = 0;
+                if (filteredCharging.length >= 2) {
+                    const sorted = [...filteredCharging].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    totalMileage = sorted[sorted.length - 1].mileage - sorted[0].mileage;
+                }
+
+                // 计算总充电量
+                const totalChargingAmount = filteredCharging.reduce((sum, record) => sum + (record.amount || 0), 0).toFixed(2);
+
+                // 计算充电费用
+                const totalChargingFee = filteredCharging.reduce((sum, record) => sum + (record.cost || 0), 0).toFixed(2);
+
+                // 计算停车费用
+                const totalParkingFee = filteredParking.reduce((sum, record) => sum + (record.cost || 0), 0).toFixed(2);
+
+                // 更新DOM
+                document.getElementById('yearlyMileage').innerHTML = `<span>${totalMileage}</span><span class="unit">km</span>`;
+                document.getElementById('yearlyChargingAmount').innerHTML = `<span>${totalChargingAmount}</span><span class="unit">kWh</span>`;
+                document.getElementById('yearlyChargingFee').innerHTML = `<span>¥${totalChargingFee}</span><span class="unit">元</span>`;
+                document.getElementById('yearlyParkingFee').innerHTML = `<span>¥${totalParkingFee}</span><span class="unit">元</span>`;
+            }
+
+            // 更新数据导出提示信息
+            updateExportInfo() {
+                const lastExportTimeStr = localStorage.getItem('lastExportTime');
+                const lastExportTimeEl = document.getElementById('lastExportTime');
+                const daysSinceExportEl = document.getElementById('daysSinceExport');
+                
+                if (lastExportTimeStr) {
+                    // 计算上次导出时间
+                    const lastExportTime = new Date(lastExportTimeStr);
+                    const now = new Date();
+                    
+                    // 格式化上次导出时间显示
+                    const formattedDate = `${lastExportTime.getFullYear()}年${String(lastExportTime.getMonth() + 1).padStart(2, '0')}月${String(lastExportTime.getDate()).padStart(2, '0')}日`;
+                    lastExportTimeEl.textContent = formattedDate;
+                    
+                    // 计算未备份天数（不计算起始日期，当天备份标注为0天）
+                    // 设置时间为00:00:00，避免时间差异影响计算
+                    lastExportTime.setHours(0, 0, 0, 0);
+                    now.setHours(0, 0, 0, 0);
+                    
+                    const diffTime = now - lastExportTime;
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    daysSinceExportEl.textContent = diffDays;
+                } else {
+                    // 从未导出过
+                    lastExportTimeEl.textContent = '从未导出';
+                    daysSinceExportEl.textContent = '0';
+                }
+            }
+
+            renderChargingRecords() {
+                const records = DataStorage.getChargingRecords();
+                const tbody = document.getElementById('chargingRecords');
+
+                if (records.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">暂无充电记录</td></tr>`;
+                    return;
+                }
+                
+                // 解析中文日期为时间戳的辅助函数
+                const parseChineseDate = (dateStr) => {
+                    if (!dateStr) return 0;
+                    // 处理中文格式日期 "2025年1月14日" 或 ISO格式 "2025-01-14"
+                    const match = dateStr.match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})[日]?/);
+                    if (match) {
+                        const year = parseInt(match[1]);
+                        const month = parseInt(match[2]) - 1;
+                        const day = parseInt(match[3]);
+                        return new Date(year, month, day).getTime();
+                    }
+                    // 尝试直接解析
+                    return new Date(dateStr).getTime() || 0;
+                };
+
+                // 按日期升序排序所有记录，用于计算电耗
+                const sortedRecords = [...records].sort((a, b) => parseChineseDate(a.date) - parseChineseDate(b.date));
+                
+                // 找出所有充满的记录，按日期升序排序
+                const fullRecords = sortedRecords.filter(record => record.isFull);
+                
+                // 计算每条记录对应的电耗
+                const recordsWithElectricity = sortedRecords.map(record => {
+                    let electricity = 0;
+                    
+                    // 只有当有至少两次充满记录时才计算电耗
+                    if (fullRecords.length >= 2) {
+                        // 遍历所有充满记录，找出当前记录所在的充满周期
+                        for (let i = 0; i < fullRecords.length - 1; i++) {
+                            const prevFull = fullRecords[i];
+                            const currFull = fullRecords[i + 1];
+                            
+                            const recordTimestamp = parseChineseDate(record.date);
+                            const prevFullTimestamp = parseChineseDate(prevFull.date);
+                            const currFullTimestamp = parseChineseDate(currFull.date);
+                            
+                            // 检查当前记录是否在这个充满周期内
+                            if (recordTimestamp > prevFullTimestamp && recordTimestamp <= currFullTimestamp) {
+                                // 计算该周期内的所有充电记录（包括当前充满记录）
+                                const periodRecords = sortedRecords.filter(r => {
+                                    const rTimestamp = parseChineseDate(r.date);
+                                    return rTimestamp > prevFullTimestamp && rTimestamp <= currFullTimestamp;
+                                });
+                                
+                                const totalElectricity = periodRecords.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+                                const mileageDiff = currFull.mileage - prevFull.mileage;
+                                
+                                if (mileageDiff > 0) {
+                                    electricity = (totalElectricity / mileageDiff * 100);
+                                }
+                                break; // 找到对应的充满周期后跳出循环
+                            }
+                        }
+                    }
+                    
+                    return { ...record, electricity };
+                });
+
+                // 按日期降序排序显示
+                recordsWithElectricity.sort((a, b) => parseChineseDate(b.date) - parseChineseDate(a.date));
+
+                tbody.innerHTML = recordsWithElectricity.map(record => `
+                    <tr>
+                        <td>${Utils.formatDate(record.date)}</td>
+                        <td>${Math.round(parseFloat(record.mileage || 0))}</td>
+                        <td>${parseFloat(record.amount || 0).toFixed(2)}</td>
+                        <td>${parseFloat(record.price || 0).toFixed(2)}</td>
+                        <td>${parseFloat(record.cost || 0).toFixed(2)}</td>
+                        <td>${record.isFull ? '是' : '否'}</td>
+                        <td>${record.isFull && record.electricity > 0 ? record.electricity.toFixed(2) : ''}</td>
+                        <td>
+                            <button class="edit-btn" onclick="app.editChargingRecord('${record.id}')" style="background-color: #2196F3; color: white; border: none; padding: 8px 12px; font-size: 13px; border-radius: 8px; cursor: pointer; margin-right: 5px; transition: all 0.3s ease;">修改</button>
+                            <button class="delete-btn" onclick="app.deleteChargingRecord('${record.id}')">删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            renderParkingRecords() {
+                const records = DataStorage.getParkingRecords();
+                const tbody = document.getElementById('parkingRecords');
+
+                if (records.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">暂无停车记录</td></tr>`;
+                    return;
+                }
+                
+                // 解析中文日期为时间戳的辅助函数
+                const parseChineseDate = (dateStr) => {
+                    if (!dateStr) return 0;
+                    // 处理中文格式日期 "2025年1月14日" 或 ISO格式 "2025-01-14"
+                    const match = dateStr.match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})[日]?/);
+                    if (match) {
+                        const year = parseInt(match[1]);
+                        const month = parseInt(match[2]) - 1;
+                        const day = parseInt(match[3]);
+                        return new Date(year, month, day).getTime();
+                    }
+                    // 尝试直接解析
+                    return new Date(dateStr).getTime() || 0;
+                };
+
+                // 按日期降序排序
+                records.sort((a, b) => parseChineseDate(b.date) - parseChineseDate(a.date));
+
+                tbody.innerHTML = records.map(record => `
+                    <tr>
+                        <td>${Utils.formatDate(record.date)}</td>
+                        <td>${record.cost || 0}</td>
+                        <td>
+                            <button class="edit-btn" onclick="app.editParkingRecord('${record.id}')" style="background-color: #2196F3; color: white; border: none; padding: 8px 12px; font-size: 13px; border-radius: 8px; cursor: pointer; margin-right: 5px; transition: all 0.3s ease;">修改</button>
+                            <button class="delete-btn" onclick="app.deleteParkingRecord('${record.id}')">删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            renderCharts() {
+                this.renderElectricityChart();
+                this.renderCostChart();
+            }
+
+            renderElectricityChart() {
+                const chargingRecords = DataStorage.getChargingRecords();
+
+                // 使用所有数据，不进行时间过滤
+                let filteredRecords = [...chargingRecords];
+
+                // 确保canvas元素存在
+                const chartWrapper = document.getElementById('electricityChart')?.parentElement;
+                if (!chartWrapper) return;
+
+                // 如果当前是空白状态，重新创建canvas元素
+                if (!document.getElementById('electricityChart')) {
+                    chartWrapper.innerHTML = `
+                        <h3><i class="fas fa-chart-line"></i> 电耗趋势</h3>
+                        <canvas id="electricityChart"></canvas>
+                    `;
+                }
+
+                if (filteredRecords.length === 0) {
+                    if (this.chargingChart) {
+                        this.chargingChart.destroy();
+                    }
+                    chartWrapper.innerHTML = `
+                        <h3><i class="fas fa-chart-line"></i> 电耗趋势</h3>
+                        <div class="empty-state" style="height: 180px; display: flex; align-items: center; justify-content: center;">
+                            暂无数据
+                        </div>
+                    `;
+                    return;
+                }
+
+                const ctx = document.getElementById('electricityChart').getContext('2d');
+
+                // 按日期排序
+                filteredRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                // 准备百公里电耗数据
+                const electricityPer100kmData = [];
+                const labels = [];
+                
+                // 找出所有充满的记录
+                const fullChargingRecords = filteredRecords.filter(record => record.isFull);
+                
+                // 计算每两次充满之间的电耗
+                for (let i = 1; i < fullChargingRecords.length; i++) {
+                    const prevFull = fullChargingRecords[i - 1];
+                    const currFull = fullChargingRecords[i];
+                    
+                    // 找出在上一次充满之后到最近一次充满之间的所有充电记录（包括最近一次）
+                    const recordsBetweenFull = filteredRecords.filter(record => {
+                        const recordDate = new Date(record.date);
+                        const prevFullDate = new Date(prevFull.date);
+                        const currFullDate = new Date(currFull.date);
+                        return recordDate > prevFullDate && recordDate <= currFullDate;
+                    });
+                    
+                    // 计算这段时间内的总充电量
+                    const totalAmount = recordsBetweenFull.reduce((sum, record) => sum + record.amount, 0);
+                    
+                    // 里程差：本次充满公里数 - 上一次充满公里数
+                    const mileageDiff = currFull.mileage - prevFull.mileage;
+                    
+                    if (mileageDiff > 0 && totalAmount > 0) {
+                        // 计算百公里电耗：(总充电量 / 里程差) * 100
+                        const electricityPer100km = (totalAmount / mileageDiff) * 100;
+                        electricityPer100kmData.push(parseFloat(electricityPer100km.toFixed(2)));
+                        labels.push(Utils.formatDate(currFull.date));
+                    }
+                }
+                
+                // 只显示最后7次数据
+                if (electricityPer100kmData.length > 7) {
+                    electricityPer100kmData.splice(0, electricityPer100kmData.length - 7);
+                    labels.splice(0, labels.length - 7);
+                }
+                
+                // 如果没有有效数据，显示暂无数据
+                if (electricityPer100kmData.length === 0) {
+                    if (this.chargingChart) {
+                        this.chargingChart.destroy();
+                    }
+                    chartWrapper.innerHTML = `
+                        <h3><i class="fas fa-chart-line"></i> 电耗趋势</h3>
+                        <div class="empty-state" style="height: 180px; display: flex; align-items: center; justify-content: center;">
+                            暂无数据
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 销毁现有图表
+                if (this.chargingChart) {
+                    this.chargingChart.destroy();
+                }
+
+                // 创建新图表
+                this.chargingChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '',
+                            data: electricityPer100kmData,
+                            borderColor: '#4CAF50',
+                            backgroundColor: '#4CAF50',
+                            borderRadius: 4,
+                            borderSkipped: false,
+                            barPercentage: 0.8,
+                            categoryPercentage: 0.9
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                            padding: {
+                                top: 20,
+                                bottom: 30,
+                                left: 10,
+                                right: 10
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: true,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `电耗: ${context.parsed.y.toFixed(1)} 度/百公里`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                display: true,
+                                color: '#333',
+                                font: {
+                                    size: 11,
+                                    weight: 'bold'
+                                },
+                                formatter: function(value) {
+                                    return parseFloat(value).toFixed(1) + '度';
+                                },
+                                anchor: 'end',
+                                align: 'top',
+                                offset: -5
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    display: false
+                                },
+                                display: false
+                            },
+                            x: {
+                                grid: {
+                                    display: false,
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    display: false
+                                },
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+            }
+
+            renderCostChart() {
+                const chargingRecords = DataStorage.getChargingRecords();
+                const parkingRecords = DataStorage.getParkingRecords();
+
+                // 获取当前年份
+                const currentYear = new Date().getFullYear();
+                
+                // 根据统计方式过滤数据
+                let filteredCharging = [...chargingRecords];
+                let filteredParking = [...parkingRecords];
+                
+                if (this.costTimeRange === 'year') {
+                    // 按今年（自然年）过滤
+                    filteredCharging = chargingRecords.filter(record => {
+                        const recordDate = new Date(record.date);
+                        return recordDate.getFullYear() === currentYear;
+                    });
+                    
+                    filteredParking = parkingRecords.filter(record => {
+                        const recordDate = new Date(record.date);
+                        return recordDate.getFullYear() === currentYear;
+                    });
+                }
+                // 否则使用所有数据
+
+                // 计算费用
+                const totalCharging = filteredCharging.reduce((sum, record) => sum + (record.cost || 0), 0);
+                const totalParking = filteredParking.reduce((sum, record) => sum + (record.cost || 0), 0);
+
+                // 确保图表容器存在
+                const chartWrapper = document.querySelector('.cost-chart-wrapper');
+                if (!chartWrapper) return;
+
+                // 添加饼图专用类
+                chartWrapper.classList.add('pie-chart-wrapper');
+
+                // 销毁现有图表
+                if (this.costChart) {
+                    this.costChart.destroy();
+                    this.costChart = null;
+                }
+
+                // 如果没有数据，显示暂无数据
+                if (totalCharging === 0 && totalParking === 0) {
+                    chartWrapper.innerHTML = `
+                        <h3><i class="fas fa-chart-pie"></i> 费用构成</h3>
+                        <!-- 增加统计方式切换按钮 -->
+                        <div class="time-selector" style="margin-bottom: 15px;">
+                            <button class="time-btn ${this.costTimeRange === 'year' ? 'active' : ''}" data-time="year">年</button>
+                            <button class="time-btn ${this.costTimeRange === 'total' ? 'active' : ''}" data-time="total">全部</button>
+                        </div>
+                        <div class="empty-state" style="height: 230px; display: flex; align-items: center; justify-content: center;">
+                            暂无数据
+                        </div>
+                    `;
+                    // 重新绑定事件
+                    this.setupEventListeners();
+                    return;
+                }
+
+                // 确保canvas元素存在
+                if (!document.getElementById('costChart')) {
+                    chartWrapper.innerHTML = `
+                        <h3><i class="fas fa-chart-pie"></i> 费用构成</h3>
+                        <!-- 增加统计方式切换按钮 -->
+                        <div class="time-selector" style="margin-bottom: 15px;">
+                            <button class="time-btn ${this.costTimeRange === 'year' ? 'active' : ''}" data-time="year">年</button>
+                            <button class="time-btn ${this.costTimeRange === 'total' ? 'active' : ''}" data-time="total">全部</button>
+                        </div>
+                        <canvas id="costChart"></canvas>
+                    `;
+                    // 重新绑定事件
+                    this.setupEventListeners();
+                }
+
+                const ctx = document.getElementById('costChart').getContext('2d');
+
+                // 创建新图表
+                this.costChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: [
+                            `充电 ¥${totalCharging.toFixed(0)}元`,
+                            `停车 ¥${totalParking.toFixed(0)}元`
+                        ],
+                        datasets: [{
+                            data: [totalCharging, totalParking],
+                            backgroundColor: [
+                                '#4CAF50',
+                                '#2196F3'
+                            ],
+                            borderColor: [
+                                '#ffffff',
+                                '#ffffff'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                align: 'center',
+                                display: true,
+                                labels: {
+                                    // 确保图例项水平排列在同一行
+                                    boxWidth: 20,
+                                    padding: 30,
+                                    font: {
+                                        size: 17 // 缩小70%，从24px改为17px
+                                    },
+                                    usePointStyle: false,
+                                    boxHeight: 15,
+                                    maxWidth: 0, // 不限制宽度，确保文字完整显示
+                                    textAlign: 'center',
+                                    useLineHeightStyle: true,
+                                    useBorderRadius: true,
+                                    borderRadius: 3,
+                                    lineHeight: 1.5
+                                }
+                            },
+                            tooltip: {
+                                enabled: false
+                            },
+                            datalabels: {
+                                display: true,
+                                color: '#ffffff',
+                                font: {
+                                    size: 24,
+                                    weight: 'bold'
+                                },
+                                formatter: function(value, context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                    return percentage + '%';
+                                },
+                                textAlign: 'center',
+                                anchor: 'center',
+                                offset: 40
+                            }
+                        },
+                        cutout: '0%'
+                    },
+                    plugins: [ChartDataLabels]
+                });
+            }
+
+            render() {
+                this.renderDashboard();
+                this.renderChargingRecords();
+                this.renderParkingRecords();
+                
+                // 如果当前显示的是统计页面，重新渲染图表
+                if (document.getElementById('statistics').classList.contains('active')) {
+                    this.renderCharts();
+                }
+            }
+        }
+
+        // 初始化应用
+        const app = new CarExpenseTracker();
+        window.app = app; // 使其在全局可用，用于按钮的onclick事件
+    </script>
+</body>
 </html>
