@@ -1,0 +1,14 @@
+{
+  "name": "vehicle-expense-tracker",
+  "version": "1.5.0",
+  "description": "汽车费用追踪应用",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.0"
+  }
+}
