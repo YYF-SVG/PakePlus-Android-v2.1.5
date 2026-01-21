@@ -1694,128 +1694,199 @@
                     return;
                 }
 
-                var reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    try {
-                        // 兼容旧版浏览器的ArrayBuffer处理
-                        var arrayBuffer = e.target.result;
-                        var data;
-                        
-                        // 检查是否支持Uint8Array
-                        if (typeof Uint8Array !== 'undefined') {
-                            data = new Uint8Array(arrayBuffer);
-                        } else {
-                            // 旧浏览器兼容方案
-                            data = arrayBuffer;
-                        }
-                        
-                        var wb = XLSX.read(data, { 
-                            type: 'array',
-                            cellDates: true,
-                            cellNF: false,
-                            cellText: true
-                        });
-
-                        function normalizeDate(dateValue) {
-                            if (!dateValue) return new Date().toISOString().split('T')[0];
-                            
-                            var dateStr = dateValue;
-                            if (dateValue instanceof Date) {
-                                return dateValue.toISOString().split('T')[0];
-                            } else if (typeof dateValue === 'number') {
-                                var date = XLSX.SSF.parse_date_code(dateValue);
-                                if (date) {
-                                    return date.y + '-' + String(date.m + 1).padStart(2, '0') + '-' + String(date.d).padStart(2, '0');
-                                }
-                            }
-                            
-                            var match = String(dateStr).match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})[日]?/);
-                            if (match) {
-                                var year = parseInt(match[1]);
-                                var month = parseInt(match[2]);
-                                var day = parseInt(match[3]);
-                                return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-                            }
-                            
-                            var date = new Date(dateStr);
-                            return !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-                        }
-                        
-                        var result = {
-                            chargingRecords: [],
-                            parkingRecords: []
-                        };
-
-                        // 读取充电记录
-                        var chargingWs = wb.Sheets['充电记录'];
-                        if (chargingWs) {
-                            var chargingDataArray = XLSX.utils.sheet_to_json(chargingWs, { header: 1 });
-                            chargingDataArray.shift();
-                            var headers = chargingDataArray.shift();
-                            var chargingData = [];
-                            
-                            for (var i = 0; i < chargingDataArray.length; i++) {
-                                var row = chargingDataArray[i];
-                                var obj = {};
-                                for (var j = 0; j < headers.length; j++) {
-                                    obj[headers[j]] = row[j];
-                                }
-                                chargingData.push(obj);
-                            }
-                                
-                            for (var k = 0; k < chargingData.length; k++) {
-                                var record = chargingData[k];
-                                result.chargingRecords.push({
-                                    id: 'charging_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-                                    date: normalizeDate(record.日期),
-                                    mileage: Utils.safeParseFloat(record.里程),
-                                    amount: Utils.safeParseFloat(record.充电量),
-                                    price: Utils.safeParseFloat(record.电费单价),
-                                    cost: Utils.safeParseFloat(record.本次充电总费用),
-                                    isFull: String(record.是否充满).trim() === '是'
-                                });
-                            }
-                        }
-
-                        // 读取停车记录
-                        var parkingWs = wb.Sheets['停车记录'];
-                        if (parkingWs) {
-                            var parkingDataArray = XLSX.utils.sheet_to_json(parkingWs, { header: 1 });
-                            parkingDataArray.shift();
-                            var headers = parkingDataArray.shift();
-                            var parkingData = [];
-                            
-                            for (var i = 0; i < parkingDataArray.length; i++) {
-                                var row = parkingDataArray[i];
-                                var obj = {};
-                                for (var j = 0; j < headers.length; j++) {
-                                    obj[headers[j]] = row[j];
-                                }
-                                parkingData.push(obj);
-                            }
-                                
-                            for (var k = 0; k < parkingData.length; k++) {
-                                var record = parkingData[k];
-                                result.parkingRecords.push({
-                                    id: 'parking_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-                                    date: normalizeDate(record.日期),
-                                    cost: Utils.safeParseFloat(record.停车费用)
-                                });
-                            }
-                        }
-
-                        callback(null, result);
-                    } catch (error) {
-                        callback(error, null);
+                // 添加HarmonyOS兼容处理
+                try {
+                    // 检查XLSX库是否正确加载
+                    if (typeof XLSX === 'undefined') {
+                        callback(new Error('XLSX库未正确加载'), null);
+                        return;
                     }
-                };
-                
-                reader.onerror = function() {
-                    callback(new Error('文件读取失败'), null);
-                };
-                
-                reader.readAsArrayBuffer(file);
+                    
+                    var reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        try {
+                            var result = {
+                                chargingRecords: [],
+                                parkingRecords: []
+                            };
+                            
+                            // 尝试多种文件读取方式，提高兼容性
+                            var data = e.target.result;
+                            var wb;
+                            
+                            // 方法1：尝试直接使用result（可能是字符串）
+                            try {
+                                wb = XLSX.read(data, { 
+                                    type: 'binary',
+                                    cellDates: true,
+                                    cellNF: false,
+                                    cellText: true
+                                });
+                            } catch (error1) {
+                                console.log('方法1失败，尝试方法2:', error1.message);
+                                
+                                // 方法2：尝试使用ArrayBuffer
+                                try {
+                                    if (typeof Uint8Array !== 'undefined' && data instanceof ArrayBuffer) {
+                                        var uint8Data = new Uint8Array(data);
+                                        wb = XLSX.read(uint8Data, { 
+                                            type: 'array',
+                                            cellDates: true,
+                                            cellNF: false,
+                                            cellText: true
+                                        });
+                                    } else {
+                                        throw new Error('不支持Uint8Array或data不是ArrayBuffer');
+                                    }
+                                } catch (error2) {
+                                    console.log('方法2失败，尝试方法3:', error2.message);
+                                    
+                                    // 方法3：尝试转换为字符串
+                                    try {
+                                        var binaryStr = '';
+                                        var bytes = new Uint8Array(data);
+                                        for (var i = 0; i < bytes.byteLength; i++) {
+                                            binaryStr += String.fromCharCode(bytes[i]);
+                                        }
+                                        wb = XLSX.read(binaryStr, { 
+                                            type: 'binary',
+                                            cellDates: true,
+                                            cellNF: false,
+                                            cellText: true
+                                        });
+                                    } catch (error3) {
+                                        console.log('方法3失败:', error3.message);
+                                        callback(new Error('无法解析Excel文件: ' + error3.message), null);
+                                        return;
+                                    }
+                                }
+                            }
+
+                            function normalizeDate(dateValue) {
+                                if (!dateValue) return new Date().toISOString().split('T')[0];
+                                
+                                var dateStr = dateValue;
+                                if (dateValue instanceof Date) {
+                                    return dateValue.toISOString().split('T')[0];
+                                } else if (typeof dateValue === 'number') {
+                                    var date = XLSX.SSF.parse_date_code(dateValue);
+                                    if (date) {
+                                        return date.y + '-' + String(date.m + 1).padStart(2, '0') + '-' + String(date.d).padStart(2, '0');
+                                    }
+                                }
+                                
+                                var match = String(dateStr).match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})[日]?/);
+                                if (match) {
+                                    var year = parseInt(match[1]);
+                                    var month = parseInt(match[2]);
+                                    var day = parseInt(match[3]);
+                                    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+                                }
+                                
+                                var date = new Date(dateStr);
+                                return !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                            }
+
+                            // 读取充电记录
+                            var chargingWs = wb.Sheets['充电记录'];
+                            if (chargingWs) {
+                                try {
+                                    var chargingDataArray = XLSX.utils.sheet_to_json(chargingWs, { header: 1 });
+                                    if (chargingDataArray && chargingDataArray.length > 2) {
+                                        chargingDataArray.shift();
+                                        var headers = chargingDataArray.shift();
+                                        var chargingData = [];
+                                        
+                                        for (var i = 0; i < chargingDataArray.length; i++) {
+                                            var row = chargingDataArray[i];
+                                            if (row && row.length > 0) {
+                                                var obj = {};
+                                                for (var j = 0; j < headers.length; j++) {
+                                                    obj[headers[j]] = row[j];
+                                                }
+                                                chargingData.push(obj);
+                                            }
+                                        }
+                                            
+                                        for (var k = 0; k < chargingData.length; k++) {
+                                            var record = chargingData[k];
+                                            result.chargingRecords.push({
+                                                id: 'charging_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                                                date: normalizeDate(record.日期),
+                                                mileage: Utils.safeParseFloat(record.里程),
+                                                amount: Utils.safeParseFloat(record.充电量),
+                                                price: Utils.safeParseFloat(record.电费单价),
+                                                cost: Utils.safeParseFloat(record.本次充电总费用),
+                                                isFull: String(record.是否充满).trim() === '是'
+                                            });
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.log('读取充电记录失败:', error.message);
+                                    // 继续执行，不中断整个导入过程
+                                }
+                            }
+
+                            // 读取停车记录
+                            var parkingWs = wb.Sheets['停车记录'];
+                            if (parkingWs) {
+                                try {
+                                    var parkingDataArray = XLSX.utils.sheet_to_json(parkingWs, { header: 1 });
+                                    if (parkingDataArray && parkingDataArray.length > 2) {
+                                        parkingDataArray.shift();
+                                        var headers = parkingDataArray.shift();
+                                        var parkingData = [];
+                                        
+                                        for (var i = 0; i < parkingDataArray.length; i++) {
+                                            var row = parkingDataArray[i];
+                                            if (row && row.length > 0) {
+                                                var obj = {};
+                                                for (var j = 0; j < headers.length; j++) {
+                                                    obj[headers[j]] = row[j];
+                                                }
+                                                parkingData.push(obj);
+                                            }
+                                        }
+                                            
+                                        for (var k = 0; k < parkingData.length; k++) {
+                                            var record = parkingData[k];
+                                            result.parkingRecords.push({
+                                                id: 'parking_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                                                date: normalizeDate(record.日期),
+                                                cost: Utils.safeParseFloat(record.停车费用)
+                                            });
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.log('读取停车记录失败:', error.message);
+                                    // 继续执行，不中断整个导入过程
+                                }
+                            }
+
+                            callback(null, result);
+                        } catch (error) {
+                            console.error('文件解析失败:', error);
+                            callback(new Error('文件解析失败: ' + error.message), null);
+                        }
+                    };
+                    
+                    reader.onerror = function(e) {
+                        console.error('文件读取失败:', e);
+                        callback(new Error('文件读取失败: ' + e.target.error.code), null);
+                    };
+                    
+                    // 尝试多种读取方式
+                    try {
+                        reader.readAsBinaryString(file);
+                    } catch (error) {
+                        console.log('readAsBinaryString失败，尝试readAsArrayBuffer:', error.message);
+                        reader.readAsArrayBuffer(file);
+                    }
+                } catch (error) {
+                    console.error('初始化文件读取失败:', error);
+                    callback(new Error('初始化文件读取失败: ' + error.message), null);
+                }
             }
         }
 
