@@ -1,0 +1,29 @@
+{
+  "name": "car-expense-tracker",
+  "version": "1.5.2",
+  "description": "汽车费用追踪应用",
+  "author": "",
+  "main": "index.html",
+  "window": {
+    "title": "汽车费用追踪",
+    "width": 800,
+    "height": 600,
+    "resizable": true,
+    "icon": "icon.ico"
+  },
+  "permissions": {
+    "android": {
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "MANAGE_EXTERNAL_STORAGE"
+      ]
+    }
+  },
+  "file": {
+    "enabled": true
+  },
+  "dependencies": {
+    "xlsx": "0.18.5"
+  }
+}
