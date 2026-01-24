@@ -167,11 +167,20 @@ class PakePlusStorage {
         try {
             // 使用PakePlus的openFile API选择文件
             const fileResult = await window.pakeplus.file.openFile({
-                accept: '.xlsx, .xls'
+                accept: '.xlsx, .xls',
+                multiple: false
             });
             
-            if (!fileResult.success || !fileResult.content) {
-                return null;
+            if (!fileResult.success) {
+                console.error('文件选择失败:', fileResult.error || '未知错误');
+                alert('文件选择失败: ' + (fileResult.error || '未知错误'));
+                return { chargingRecords: [], parkingRecords: [] };
+            }
+            
+            if (!fileResult.content) {
+                console.error('文件内容为空');
+                alert('文件内容为空');
+                return { chargingRecords: [], parkingRecords: [] };
             }
             
             // 读取文件内容
@@ -186,11 +195,107 @@ class PakePlusStorage {
                 cellText: true
             });
             
-            // 调用原有的ExcelProcessor.importFromExcel逻辑来解析数据
-            return await ExcelProcessor.parseExcelData(wb);
+            // 解析Excel数据（直接在当前文件中实现，避免依赖外部对象）
+            return this.parseExcelData(wb);
         } catch (error) {
             console.error('导入Excel失败:', error);
+            alert('导入Excel失败: ' + error.message);
             throw error;
         }
+    }
+    
+    // 解析Excel数据的方法（内部使用）
+    static parseExcelData(wb) {
+        const normalizeDate = (dateValue) => {
+            if (!dateValue) return new Date().toISOString().split('T')[0];
+            
+            let dateStr = dateValue;
+            if (dateValue instanceof Date) {
+                return dateValue.toISOString().split('T')[0];
+            } else if (typeof dateValue === 'number') {
+                const date = XLSX.SSF.parse_date_code(dateValue);
+                if (date) {
+                    return `${date.y}-${String(date.m + 1).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+                }
+            }
+            
+            const match = String(dateStr).match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})[日]?/);
+            if (match) {
+                const year = parseInt(match[1]);
+                const month = parseInt(match[2]);
+                const day = parseInt(match[3]);
+                return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+            
+            const date = new Date(dateStr);
+            return !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        };
+        
+        const result = {
+            chargingRecords: [],
+            parkingRecords: []
+        };
+
+        // 读取充电记录
+        const chargingWs = wb.Sheets['充电记录'];
+        if (chargingWs) {
+            const chargingDataArray = XLSX.utils.sheet_to_json(chargingWs, { header: 1 });
+            if (chargingDataArray.length > 1) {
+                chargingDataArray.shift(); // 移除标题行
+                const headers = chargingDataArray.shift();
+                const chargingData = chargingDataArray.map(row => {
+                    const obj = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = row[index];
+                    });
+                    return obj;
+                });
+                
+                result.chargingRecords = chargingData.map(record => ({
+                    id: `charging_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                    date: normalizeDate(record.日期),
+                    mileage: this.safeParseFloat(record.里程),
+                    amount: this.safeParseFloat(record.充电量),
+                    price: this.safeParseFloat(record.电费单价),
+                    cost: this.safeParseFloat(record.本次充电总费用),
+                    isFull: String(record.是否充满).trim() === '是'
+                }));
+            }
+        }
+
+        // 读取停车记录
+        const parkingWs = wb.Sheets['停车记录'];
+        if (parkingWs) {
+            const parkingDataArray = XLSX.utils.sheet_to_json(parkingWs, { header: 1 });
+            if (parkingDataArray.length > 1) {
+                parkingDataArray.shift(); // 移除标题行
+                const headers = parkingDataArray.shift();
+                const parkingData = parkingDataArray.map(row => {
+                    const obj = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = row[index];
+                    });
+                    return obj;
+                });
+                
+                result.parkingRecords = parkingData.map(record => ({
+                    id: `parking_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                    date: normalizeDate(record.日期),
+                    cost: this.safeParseFloat(record.停车费用)
+                }));
+            }
+        }
+
+        return result;
+    }
+    
+    // 安全解析数字的辅助方法
+    static safeParseFloat(value) {
+        if (value === null || value === undefined || value === '') return 0;
+        if (typeof value === 'string') {
+            value = value.replace(/,/g, '').trim();
+        }
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? 0 : parsed;
     }
 }
