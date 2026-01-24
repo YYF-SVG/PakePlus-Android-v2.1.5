@@ -1043,19 +1043,30 @@
             // 获取充电记录
             static async getChargingRecords() {
                 if (window.PakePlusStorage) {
-                    return await PakePlusStorage.getChargingRecords();
+                    const records = await PakePlusStorage.getChargingRecords();
+                    // 确保返回值始终是数组
+                    return Array.isArray(records) ? records : [];
                 } else {
                     const records = localStorage.getItem('chargingRecords');
-                    return records ? JSON.parse(records) : [];
+                    try {
+                        const parsed = records ? JSON.parse(records) : [];
+                        // 确保返回值始终是数组
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch (error) {
+                        console.error('解析充电记录失败:', error);
+                        return [];
+                    }
                 }
             }
 
             // 保存充电记录
             static async saveChargingRecords(records) {
+                // 确保保存的数据是数组
+                const safeRecords = Array.isArray(records) ? records : [];
                 if (window.PakePlusStorage) {
-                    return await PakePlusStorage.saveChargingRecords(records);
+                    return await PakePlusStorage.saveChargingRecords(safeRecords);
                 } else {
-                    localStorage.setItem('chargingRecords', JSON.stringify(records));
+                    localStorage.setItem('chargingRecords', JSON.stringify(safeRecords));
                     return true;
                 }
             }
@@ -1063,19 +1074,30 @@
             // 获取停车记录
             static async getParkingRecords() {
                 if (window.PakePlusStorage) {
-                    return await PakePlusStorage.getParkingRecords();
+                    const records = await PakePlusStorage.getParkingRecords();
+                    // 确保返回值始终是数组
+                    return Array.isArray(records) ? records : [];
                 } else {
                     const records = localStorage.getItem('parkingRecords');
-                    return records ? JSON.parse(records) : [];
+                    try {
+                        const parsed = records ? JSON.parse(records) : [];
+                        // 确保返回值始终是数组
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch (error) {
+                        console.error('解析停车记录失败:', error);
+                        return [];
+                    }
                 }
             }
 
             // 保存停车记录
             static async saveParkingRecords(records) {
+                // 确保保存的数据是数组
+                const safeRecords = Array.isArray(records) ? records : [];
                 if (window.PakePlusStorage) {
-                    return await PakePlusStorage.saveParkingRecords(records);
+                    return await PakePlusStorage.saveParkingRecords(safeRecords);
                 } else {
-                    localStorage.setItem('parkingRecords', JSON.stringify(records));
+                    localStorage.setItem('parkingRecords', JSON.stringify(safeRecords));
                     return true;
                 }
             }
@@ -1245,9 +1267,9 @@
                     sum + Utils.safeParseFloat(record.cost), 0).toFixed(2);
             }
 
-            static calculateTotalDays() {
-                const chargingRecords = DataStorage.getChargingRecords();
-                const parkingRecords = DataStorage.getParkingRecords();
+            static async calculateTotalDays() {
+                const chargingRecords = await DataStorage.getChargingRecords();
+                const parkingRecords = await DataStorage.getParkingRecords();
                 
                 if (chargingRecords.length === 0 && parkingRecords.length === 0) return 0;
                 
@@ -1632,49 +1654,73 @@
                 };
 
                 // 读取充电记录
-                const chargingWs = wb.Sheets['充电记录'];
+                const chargingWs = wb.Sheets['充电记录'] || wb.Sheets['Charging Records'] || wb.Sheets[Object.keys(wb.Sheets)[0]];
                 if (chargingWs) {
+                    console.log('找到充电记录工作表');
                     const chargingDataArray = XLSX.utils.sheet_to_json(chargingWs, { header: 1 });
-                    chargingDataArray.shift();
-                    const headers = chargingDataArray.shift();
-                    const chargingData = chargingDataArray.map(row => {
-                        const obj = {};
-                        headers.forEach((header, index) => {
-                            obj[header] = row[index];
-                        });
-                        return obj;
-                    });
+                    console.log('充电记录数据行数:', chargingDataArray.length);
                     
-                    result.chargingRecords = chargingData.map(record => ({
-                        id: `charging_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                        date: normalizeDate(record.日期),
-                        mileage: Utils.safeParseFloat(record.里程),
-                        amount: Utils.safeParseFloat(record.充电量),
-                        price: Utils.safeParseFloat(record.电费单价),
-                        cost: Utils.safeParseFloat(record.本次充电总费用),
-                        isFull: String(record.是否充满).trim() === '是'
-                    }));
+                    if (chargingDataArray.length > 1) {
+                        const headers = chargingDataArray.shift(); // 获取标题行
+                        console.log('充电记录标题行:', headers);
+                        
+                        const chargingData = chargingDataArray.map(row => {
+                            const obj = {};
+                            headers.forEach((header, index) => {
+                                obj[header] = row[index];
+                            });
+                            return obj;
+                        });
+                        
+                        console.log('解析到充电记录:', chargingData.length, '条');
+                        
+                        result.chargingRecords = chargingData.map(record => ({
+                            id: `charging_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                            date: normalizeDate(record.日期 || record.Date || record.date),
+                            mileage: Utils.safeParseFloat(record.里程 || record.Mileage || record.mileage),
+                            amount: Utils.safeParseFloat(record.充电量 || record.Amount || record.amount),
+                            price: Utils.safeParseFloat(record.电费单价 || record.Price || record.price),
+                            cost: Utils.safeParseFloat(record.本次充电总费用 || record.Cost || record.cost),
+                            isFull: (String(record.是否充满 || record.IsFull || record.isFull).trim() === '是') || (String(record.是否充满 || record.IsFull || record.isFull).trim() === 'true')
+                        }));
+                        
+                        console.log('处理后充电记录:', result.chargingRecords.length, '条');
+                    }
+                } else {
+                    console.error('未找到充电记录工作表');
                 }
 
                 // 读取停车记录
-                const parkingWs = wb.Sheets['停车记录'];
+                const parkingWs = wb.Sheets['停车记录'] || wb.Sheets['Parking Records'] || wb.Sheets[Object.keys(wb.Sheets)[1]];
                 if (parkingWs) {
+                    console.log('找到停车记录工作表');
                     const parkingDataArray = XLSX.utils.sheet_to_json(parkingWs, { header: 1 });
-                    parkingDataArray.shift();
-                    const headers = parkingDataArray.shift();
-                    const parkingData = parkingDataArray.map(row => {
-                        const obj = {};
-                        headers.forEach((header, index) => {
-                            obj[header] = row[index];
-                        });
-                        return obj;
-                    });
+                    console.log('停车记录数据行数:', parkingDataArray.length);
                     
-                    result.parkingRecords = parkingData.map(record => ({
-                        id: `parking_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                        date: normalizeDate(record.日期),
-                        cost: Utils.safeParseFloat(record.停车费用)
-                    }));
+                    if (parkingDataArray.length > 1) {
+                        const headers = parkingDataArray.shift(); // 获取标题行
+                        console.log('停车记录标题行:', headers);
+                        
+                        const parkingData = parkingDataArray.map(row => {
+                            const obj = {};
+                            headers.forEach((header, index) => {
+                                obj[header] = row[index];
+                            });
+                            return obj;
+                        });
+                        
+                        console.log('解析到停车记录:', parkingData.length, '条');
+                        
+                        result.parkingRecords = parkingData.map(record => ({
+                            id: `parking_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                            date: normalizeDate(record.日期 || record.Date || record.date),
+                            cost: Utils.safeParseFloat(record.停车费用 || record.Cost || record.cost)
+                        }));
+                        
+                        console.log('处理后停车记录:', result.parkingRecords.length, '条');
+                    }
+                } else {
+                    console.error('未找到停车记录工作表');
                 }
 
                 return result;
@@ -2230,7 +2276,15 @@
                     let result;
                     if (window.PakePlusStorage) {
                         result = await PakePlusStorage.importFromExcel();
-                    } else {
+                        
+                        // 如果result为null，说明PakePlus环境未初始化，使用浏览器文件选择
+                        if (result === null) {
+                            console.log('PakePlus环境未完全初始化，使用浏览器文件选择');
+                            result = undefined;
+                        }
+                    }
+                    
+                    if (!result) {
                         // 在浏览器环境下，需要先选择文件
                         if (!file) {
                             // 创建文件输入元素
@@ -2258,17 +2312,36 @@
                         }
                     }
                     
-                    if (result.chargingRecords.length > 0) {
-                        await DataStorage.saveChargingRecords(result.chargingRecords);
+                    // 安全检查：确保result是有效的对象
+                    if (!result || typeof result !== 'object') {
+                        console.error('无效的结果对象:', result);
+                        alert('导入失败：无效的文件格式');
+                        return;
                     }
                     
-                    if (result.parkingRecords.length > 0) {
-                        await DataStorage.saveParkingRecords(result.parkingRecords);
+                    // 安全检查：确保chargingRecords是数组
+                    const chargingRecords = Array.isArray(result.chargingRecords) ? result.chargingRecords : [];
+                    
+                    // 安全检查：确保parkingRecords是数组
+                    const parkingRecords = Array.isArray(result.parkingRecords) ? result.parkingRecords : [];
+                    
+                    // 保存充电记录
+                    if (chargingRecords.length > 0) {
+                        await DataStorage.saveChargingRecords(chargingRecords);
+                    }
+                    
+                    // 保存停车记录
+                    if (parkingRecords.length > 0) {
+                        await DataStorage.saveParkingRecords(parkingRecords);
                     }
                     
                     await this.render();
-                    alert('导入成功！');
+                    
+                    // 显示详细的导入结果
+                    const message = `导入成功！\n\n充电记录：${chargingRecords.length} 条\n停车记录：${parkingRecords.length} 条\n\n总计：${chargingRecords.length + parkingRecords.length} 条记录`;
+                    alert(message);
                 } catch (error) {
+                    console.error('导入Excel失败:', error);
                     alert('导入失败：' + error.message);
                 }
             }
@@ -2459,7 +2532,8 @@
                     }
                 };
 
-                updateCard('totalDays', ElectricityCalculator.calculateTotalDays(), '天');
+                const totalDays = await ElectricityCalculator.calculateTotalDays();
+                updateCard('totalDays', totalDays, '天');
                 updateCard('electricityPer100km', ElectricityCalculator.calculateElectricityPer100km(chargingRecords), '度/百公里');
                 updateCard('totalChargingFee', `¥${ElectricityCalculator.calculateTotalFee(chargingRecords, this.currentTimeRange)}`, '元');
                 updateCard('totalParkingFee', `¥${ParkingCalculator.calculateTotalFee(parkingRecords, this.currentTimeRange)}`, '元');
