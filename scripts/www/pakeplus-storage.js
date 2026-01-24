@@ -63,26 +63,30 @@ class PakePlusStorage {
     // 获取充电记录
     static async getChargingRecords() {
         const data = await this.readDataFile();
-        return data?.chargingRecords || [];
+        // 确保返回值始终是数组
+        return Array.isArray(data?.chargingRecords) ? data.chargingRecords : [];
     }
     
     // 保存充电记录
     static async saveChargingRecords(records) {
         const data = await this.readDataFile() || {};
-        data.chargingRecords = records;
+        // 确保保存的数据是数组
+        data.chargingRecords = Array.isArray(records) ? records : [];
         return await this.writeDataFile(data);
     }
     
     // 获取停车记录
     static async getParkingRecords() {
         const data = await this.readDataFile();
-        return data?.parkingRecords || [];
+        // 确保返回值始终是数组
+        return Array.isArray(data?.parkingRecords) ? data.parkingRecords : [];
     }
     
     // 保存停车记录
     static async saveParkingRecords(records) {
         const data = await this.readDataFile() || {};
-        data.parkingRecords = records;
+        // 确保保存的数据是数组
+        data.parkingRecords = Array.isArray(records) ? records : [];
         return await this.writeDataFile(data);
     }
     
@@ -164,16 +168,41 @@ class PakePlusStorage {
     
     // 导入Excel文件
     static async importFromExcel() {
+        // 检查PakePlus环境
+        if (!window.pakeplus) {
+            console.log('PakePlus环境未初始化，使用浏览器文件选择');
+            // PakePlus环境未初始化，返回null表示需要使用浏览器环境的文件选择
+            return null;
+        }
+        
+        if (!window.pakeplus.file) {
+            console.log('PakePlus文件API未可用，使用浏览器文件选择');
+            // PakePlus文件API未可用，返回null表示需要使用浏览器环境的文件选择
+            return null;
+        }
+        
+        // 检查openFile方法是否存在
+        if (typeof window.pakeplus.file.openFile !== 'function') {
+            console.log('PakePlus file.openFile方法不存在，使用浏览器文件选择');
+            // PakePlus file.openFile方法不存在，返回null表示需要使用浏览器环境的文件选择
+            return null;
+        }
+        
         try {
+            console.log('准备调用PakePlus file.openFile');
+            
             // 使用PakePlus的openFile API选择文件
             const fileResult = await window.pakeplus.file.openFile({
                 accept: '.xlsx, .xls',
                 multiple: false
             });
             
+            console.log('PakePlus file.openFile调用结果:', fileResult);
+            
             if (!fileResult.success) {
-                console.error('文件选择失败:', fileResult.error || '未知错误');
-                alert('文件选择失败: ' + (fileResult.error || '未知错误'));
+                const errorMsg = fileResult.error || '未知错误';
+                console.error('文件选择失败:', errorMsg);
+                alert('文件选择失败: ' + errorMsg);
                 return { chargingRecords: [], parkingRecords: [] };
             }
             
@@ -199,8 +228,9 @@ class PakePlusStorage {
             return this.parseExcelData(wb);
         } catch (error) {
             console.error('导入Excel失败:', error);
-            alert('导入Excel失败: ' + error.message);
-            throw error;
+            console.error('错误堆栈:', error.stack);
+            alert('导入Excel失败: ' + error.message + '\n\n详细错误: ' + JSON.stringify(error));
+            return { chargingRecords: [], parkingRecords: [] };
         }
     }
     
@@ -237,7 +267,7 @@ class PakePlusStorage {
         };
 
         // 读取充电记录
-        const chargingWs = wb.Sheets['充电记录'];
+        const chargingWs = wb.Sheets['充电记录'] || wb.Sheets['Charging Records'] || wb.Sheets[Object.keys(wb.Sheets)[0]];
         if (chargingWs) {
             const chargingDataArray = XLSX.utils.sheet_to_json(chargingWs, { header: 1 });
             if (chargingDataArray.length > 1) {
@@ -253,18 +283,18 @@ class PakePlusStorage {
                 
                 result.chargingRecords = chargingData.map(record => ({
                     id: `charging_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                    date: normalizeDate(record.日期),
-                    mileage: this.safeParseFloat(record.里程),
-                    amount: this.safeParseFloat(record.充电量),
-                    price: this.safeParseFloat(record.电费单价),
-                    cost: this.safeParseFloat(record.本次充电总费用),
-                    isFull: String(record.是否充满).trim() === '是'
+                    date: normalizeDate(record.日期 || record.Date || record.date),
+                    mileage: this.safeParseFloat(record.里程 || record.Mileage || record.mileage),
+                    amount: this.safeParseFloat(record.充电量 || record.Amount || record.amount),
+                    price: this.safeParseFloat(record.电费单价 || record.Price || record.price),
+                    cost: this.safeParseFloat(record.本次充电总费用 || record.Cost || record.cost),
+                    isFull: (String(record.是否充满 || record.IsFull || record.isFull).trim() === '是') || (String(record.是否充满 || record.IsFull || record.isFull).trim() === 'true')
                 }));
             }
         }
 
         // 读取停车记录
-        const parkingWs = wb.Sheets['停车记录'];
+        const parkingWs = wb.Sheets['停车记录'] || wb.Sheets['Parking Records'] || wb.Sheets[Object.keys(wb.Sheets)[1]];
         if (parkingWs) {
             const parkingDataArray = XLSX.utils.sheet_to_json(parkingWs, { header: 1 });
             if (parkingDataArray.length > 1) {
@@ -280,8 +310,8 @@ class PakePlusStorage {
                 
                 result.parkingRecords = parkingData.map(record => ({
                     id: `parking_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                    date: normalizeDate(record.日期),
-                    cost: this.safeParseFloat(record.停车费用)
+                    date: normalizeDate(record.日期 || record.Date || record.date),
+                    cost: this.safeParseFloat(record.停车费用 || record.Cost || record.cost)
                 }));
             }
         }
@@ -299,3 +329,6 @@ class PakePlusStorage {
         return isNaN(parsed) ? 0 : parsed;
     }
 }
+
+// 将PakePlusStorage类添加到window对象中，使其在全局可用
+window.PakePlusStorage = PakePlusStorage;
