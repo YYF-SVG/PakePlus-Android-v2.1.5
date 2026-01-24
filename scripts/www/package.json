@@ -1,0 +1,16 @@
+{
+  "name": "car-expense-tracker",
+  "version": "1.5.2",
+  "description": "汽车费用追踪应用",
+  "main": "index.html",
+  "scripts": {
+    "dev": "pakeplus dev",
+    "build": "pakeplus build"
+  },
+  "keywords": ["car", "expense", "tracker", "pakeplus"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pakeplus": "^1.0.0"
+  }
+}
